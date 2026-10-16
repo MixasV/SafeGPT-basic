@@ -1,7 +1,8 @@
 import { connectorsForWallets } from "@rainbow-me/rainbowkit";
 import { injectedWallet, metaMaskWallet, rabbyWallet, walletConnectWallet } from "@rainbow-me/rainbowkit/wallets";
 import { createConfig, http } from "wagmi";
-import { base, mainnet } from "wagmi/chains";
+
+import { SUPPORTED_CHAINS } from "./contracts";
 
 /**
  * WalletConnect requires a project id from https://cloud.walletconnect.com.
@@ -21,16 +22,17 @@ const connectors = connectorsForWallets([{ groupName: "Supported wallets", walle
   projectId,
 });
 
-/**
- * Sprint 1 ships Ethereum mainnet + Base. Additional networks are added per
- * release as the self-hosted bot gains multi-chain support.
- */
+/** RPC endpoints per chain, overridable through VITE_RPC_URL_<chainId>. */
+function transportFor(chainId: number) {
+  const override = import.meta.env[`VITE_RPC_URL_${chainId}`] as string | undefined;
+  return http(override);
+}
+
 export const wagmiConfig = createConfig({
-  chains: [mainnet, base],
+  chains: SUPPORTED_CHAINS,
   connectors,
-  transports: {
-    [mainnet.id]: http(),
-    [base.id]: http(),
-  },
+  transports: Object.fromEntries(
+    SUPPORTED_CHAINS.map((chain) => [chain.id, transportFor(chain.id)]),
+  ) as Record<number, ReturnType<typeof http>>,
   ssr: false,
 });

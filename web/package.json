@@ -11,7 +11,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -b --noEmit",
+    "build:demo": "vite build --mode demo",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@rainbow-me/rainbowkit": "^2.2.11",
@@ -24,6 +26,7 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/vite": "^4.3.3",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

@@ -61,13 +61,29 @@ forge test          # 16 tests
 ```bash
 cd web
 npm install
-cp .env.example .env.local   # optional: VITE_WALLETCONNECT_PROJECT_ID
+cp .env.example .env.local   # optional: WalletConnect project id, Alchemy key
 npm run dev
 ```
 
 Browser-injected wallets (MetaMask, Rabby, Brave) work with zero configuration.
 Add a WalletConnect project id only if you need WalletConnect.
 Get a free WalletConnect Project ID: https://cloud.walletconnect.com
+
+### Demo mode
+
+```bash
+cd web
+npm run build:demo     # .env.demo → VITE_DEMO_MODE=true
+npm run preview
+```
+
+The whole onboarding wizard — connect, drainer check, safe address, asset scan,
+vault deploy, approvals, protection active — runs end to end with no wallet, no
+gas and no real transaction. Use it for demos and for the grant video.
+
+```bash
+npm run test:e2e       # Playwright, runs the demo build in your local Chrome
+```
 
 ### Bot (after Sprint 3)
 
