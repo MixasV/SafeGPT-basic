@@ -67,6 +67,7 @@ npm run dev
 
 Browser-injected wallets (MetaMask, Rabby, Brave) work with zero configuration.
 Add a WalletConnect project id only if you need WalletConnect.
+Get a free WalletConnect Project ID: https://cloud.walletconnect.com
 
 ### Bot (after Sprint 3)
 
@@ -77,6 +78,16 @@ cp config/config.example.json config/config.json
 # edit config.json — every "ENV:NAME" string is replaced from process.env
 npm start
 ```
+
+The bot needs two RPC endpoints:
+
+| Field | Purpose | Notes |
+|---|---|---|
+| `rpcWss` | Mempool subscription for pending transactions | Alchemy / Infura / your own node |
+| `rpcHttp` | Sending the rescue transaction | Same provider is fine |
+| `flashbotsRelay` | Private bundles | Optional. Omit it and the bot sends through the public mempool. The hosted Pro/Guardian+ tiers use it. |
+
+JSON has no comments, so this table is the reference for those fields.
 
 ---
 
@@ -106,15 +117,23 @@ WETH first.
 
 * `rescue()` is callable **only** by `executor`, and can send funds **only** to
   the `safeAddress` and `feeReceiver` stored in the contract.
+* Each token in a rescue batch is processed **in isolation**: a bounded gas
+  stipend per `balanceOf`/`transferFrom`, manual return-value checks, and no
+  revert propagation. A reverting or gas-burning token can waste its own budget
+  but can never block the rescue of the remaining assets (UPD-2).
+* At most `MAX_TOKENS_PER_TX = 30` tokens per call; `rescue()` is `nonReentrant`.
 * There is no `pause()`, no `unpause()`, no `withdraw()` and no `setFee()`.
-* Changing `safeAddress` or the `whitelist` requires an owner request plus a
-  **72-hour timelock**, so a stolen owner key cannot redirect a rescue instantly.
+* Changing `safeAddress`, `quarantineAddress`, `executor` or the `whitelist`
+  requires an owner request plus a **72-hour timelock**. In particular the
+  executor cannot be swapped instantly, so an attacker with the owner key cannot
+  lock the legitimate bot out of the rescue path in a single transaction (UPD-3).
 * `feeBps` is fixed at deployment and hard-capped at `MAX_FEE_BPS = 1000`.
+* Watch-set tokens (`chargeFee = false`) are routed to `quarantineAddress` so
+  that unverified airdrops never reach the cold wallet.
 * Every user runs the **same contract bytecode** — only constructor arguments
   differ (deployed via CREATE2 by the factory).
 * Known accepted trade-offs are recorded in `docs/SECURITY.md` (Sprint 8):
-  fee-on-transfer tokens deliver less than the nominal amount, and an attacker
-  holding the owner key can still revoke approvals.
+  fee-on-transfer tokens deliver less than the nominal amount.
 
 ---
 

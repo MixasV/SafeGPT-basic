@@ -17,23 +17,27 @@ interface IERC20 {
  *         accepts native ETH — it only pulls ERC-20 tokens the owner approved.
  *
  * @dev Security model:
- *      - `rescue()` is callable ONLY by `executor` and can ONLY send tokens to
- *        the `safeAddress` / `feeReceiver` pair held in storage. There is no
- *        arbitrary-recipient path and no `withdraw()`.
- *      - `safeAddress` and `whitelist` can only be mutated by the owner AND
- *        only after a {SAFE_CHANGE_DELAY} / {WHITELIST_CHANGE_DELAY} timelock,
- *        so a stolen owner key cannot redirect a rescue instantly.
+ *      - {rescue} is callable ONLY by `executor` and can ONLY send tokens to
+ *        the destinations held in storage. There is no arbitrary-recipient path
+ *        and no `withdraw()`.
+ *      - `safeAddress`, `quarantineAddress`, `executor` and `whitelist` can only
+ *        be mutated by the owner AND only after a 72-hour timelock, so a stolen
+ *        owner key cannot redirect a rescue or lock the bot out instantly.
  *      - `feeBps` is fixed at deployment and hard-capped by {MAX_FEE_BPS}.
- *      - There is intentionally no pause mechanism: pausing is a griefing
- *        vector for a rescue contract, and the timelock already covers the
- *        legitimate need to change configuration.
+ *      - Every token in a rescue batch is processed in isolation with a bounded
+ *        gas stipend. A hostile token contract (reverting, gas-burning, or
+ *        returning malformed data) can waste its own gas budget but can never
+ *        prevent the remaining assets from being rescued.
+ *      - There is intentionally no pause mechanism: pausing is a griefing vector
+ *        for a rescue contract, and the timelock already covers the legitimate
+ *        need to change configuration.
  */
 contract RescueVault is IRescueVault {
     /*//////////////////////////////////////////////////////////////
                                 CONSTANTS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Delay that must elapse before a safe address change is applied.
+    /// @notice Delay that must elapse before a safe, quarantine or executor change is applied.
     uint256 public constant SAFE_CHANGE_DELAY = 72 hours;
 
     /// @notice Delay that must elapse before a whitelist change is applied.
@@ -42,8 +46,25 @@ contract RescueVault is IRescueVault {
     /// @notice Hard cap on the service fee: 1000 bps = 10%. Not settable.
     uint16 public constant MAX_FEE_BPS = 1000;
 
+    /// @notice Maximum number of tokens accepted by a single {rescue} call.
+    uint256 public constant MAX_TOKENS_PER_TX = 30;
+
+    /// @notice Gas forwarded to one `transferFrom`. Bounds a hostile gas bomb.
+    uint256 public constant TOKEN_GAS_LIMIT = 250_000;
+
+    /// @notice Gas forwarded to one `balanceOf`. Bounds a hostile gas bomb.
+    uint256 public constant BALANCE_GAS_LIMIT = 50_000;
+
     /// @dev Denominator for basis-point arithmetic.
     uint256 private constant BPS_DENOMINATOR = 10_000;
+
+    /// @dev Reentrancy guard states (1 = not entered, 2 = entered).
+    uint256 private constant REENTRANCY_NOT_ENTERED = 1;
+    uint256 private constant REENTRANCY_ENTERED = 2;
+
+    /// @dev Reasons reported through {RescueSkipped}.
+    bytes32 private constant REASON_BALANCE_OF = "BALANCE_OF";
+    bytes32 private constant REASON_ZERO_BALANCE = "ZERO_BALANCE";
 
     /*//////////////////////////////////////////////////////////////
                                  STORAGE
@@ -54,6 +75,9 @@ contract RescueVault is IRescueVault {
 
     /// @inheritdoc IRescueVault
     address public safeAddress;
+
+    /// @inheritdoc IRescueVault
+    address public quarantineAddress;
 
     /// @inheritdoc IRescueVault
     address public executor;
@@ -71,6 +95,18 @@ contract RescueVault is IRescueVault {
     uint256 public safeChangeRequestTime;
 
     /// @inheritdoc IRescueVault
+    address public pendingQuarantineAddress;
+
+    /// @inheritdoc IRescueVault
+    uint256 public quarantineChangeRequestTime;
+
+    /// @inheritdoc IRescueVault
+    address public pendingExecutor;
+
+    /// @inheritdoc IRescueVault
+    uint256 public executorChangeRequestTime;
+
+    /// @inheritdoc IRescueVault
     mapping(address => bool) public whitelist;
 
     /// @inheritdoc IRescueVault
@@ -78,6 +114,9 @@ contract RescueVault is IRescueVault {
 
     /// @inheritdoc IRescueVault
     mapping(address => uint256) public pendingWhitelistRemove;
+
+    /// @dev Reentrancy guard state for {rescue}.
+    uint256 private reentrancyStatus;
 
     /*//////////////////////////////////////////////////////////////
                               MODIFIERS
@@ -95,13 +134,21 @@ contract RescueVault is IRescueVault {
         _;
     }
 
+    /// @dev Single-entry guard. A hostile token cannot re-enter {rescue} mid-batch.
+    modifier nonReentrant() {
+        require(reentrancyStatus != REENTRANCY_ENTERED, "RescueVault: reentrant call");
+        reentrancyStatus = REENTRANCY_ENTERED;
+        _;
+        reentrancyStatus = REENTRANCY_NOT_ENTERED;
+    }
+
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
     /**
      * @param owner_ The protected wallet. Tokens are pulled from this address.
-     * @param safeAddress_ Where rescued tokens go. Must differ from `owner_`.
+     * @param safeAddress_ Where rescued core assets go. Must differ from `owner_`.
      * @param executor_ The bot address allowed to trigger a rescue.
      * @param feeReceiver_ Where the service fee goes.
      * @param feeBps_ The service fee in basis points. Must not exceed {MAX_FEE_BPS}.
@@ -119,6 +166,7 @@ contract RescueVault is IRescueVault {
         executor = executor_;
         feeReceiver = feeReceiver_;
         feeBps = feeBps_;
+        reentrancyStatus = REENTRANCY_NOT_ENTERED;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -126,27 +174,14 @@ contract RescueVault is IRescueVault {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IRescueVault
-    function rescue(address[] calldata tokens) external onlyExecutor {
+    function rescue(address[] calldata tokens, bool[] calldata chargeFee) external onlyExecutor nonReentrant {
         uint256 length = tokens.length;
 
+        require(length == chargeFee.length, "RescueVault: length mismatch");
+        require(length <= MAX_TOKENS_PER_TX, "RescueVault: too many tokens");
+
         for (uint256 i; i < length; ++i) {
-            address token = tokens[i];
-
-            // Read through the typed interface on purpose: the extcodesize check
-            // Solidity inserts makes a non-contract token address revert instead
-            // of silently returning a zero balance.
-            uint256 balance = IERC20(token).balanceOf(owner);
-            if (balance == 0) continue;
-
-            // Fee is computed on the full balance and the remainder is what lands
-            // on the safe address, so the two transfers always add up to the balance.
-            uint256 fee = (balance * feeBps) / BPS_DENOMINATOR;
-            uint256 amountToSafe = balance - fee;
-
-            if (amountToSafe != 0) _safeTransferFrom(token, owner, safeAddress, amountToSafe);
-            if (fee != 0) _safeTransferFrom(token, owner, feeReceiver, fee);
-
-            emit Rescued(token, amountToSafe, safeAddress);
+            _rescueOne(tokens[i], chargeFee[i]);
         }
     }
 
@@ -188,16 +223,76 @@ contract RescueVault is IRescueVault {
     }
 
     /*//////////////////////////////////////////////////////////////
-                              EXECUTOR
+                         QUARANTINE ADDRESS
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IRescueVault
-    function setExecutor(address newExecutor) external onlyOwner {
+    function requestQuarantineChange(address newQuarantine) external onlyOwner {
+        require(newQuarantine != address(0), "RescueVault: newQuarantine is zero address");
+        require(newQuarantine != owner, "RescueVault: newQuarantine must differ from owner");
+
+        pendingQuarantineAddress = newQuarantine;
+        quarantineChangeRequestTime = block.timestamp;
+
+        emit QuarantineChangeRequested(newQuarantine, block.timestamp);
+    }
+
+    /// @inheritdoc IRescueVault
+    function confirmQuarantineChange() external onlyOwner {
+        require(pendingQuarantineAddress != address(0), "RescueVault: no pending quarantine change");
+        require(
+            block.timestamp >= quarantineChangeRequestTime + SAFE_CHANGE_DELAY,
+            "RescueVault: quarantine change timelock not elapsed"
+        );
+
+        quarantineAddress = pendingQuarantineAddress;
+        pendingQuarantineAddress = address(0);
+
+        emit QuarantineChangeConfirmed(quarantineAddress);
+    }
+
+    /// @inheritdoc IRescueVault
+    function cancelQuarantineChange() external onlyOwner {
+        pendingQuarantineAddress = address(0);
+        quarantineChangeRequestTime = 0;
+
+        emit QuarantineChangeCancelled();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            EXECUTOR
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc IRescueVault
+    function requestExecutorChange(address newExecutor) external onlyOwner {
         require(newExecutor != address(0), "RescueVault: newExecutor is zero address");
 
-        executor = newExecutor;
+        pendingExecutor = newExecutor;
+        executorChangeRequestTime = block.timestamp;
 
-        emit ExecutorChanged(newExecutor);
+        emit ExecutorChangeRequested(newExecutor, block.timestamp);
+    }
+
+    /// @inheritdoc IRescueVault
+    function confirmExecutorChange() external onlyOwner {
+        require(pendingExecutor != address(0), "RescueVault: no pending executor change");
+        require(
+            block.timestamp >= executorChangeRequestTime + SAFE_CHANGE_DELAY,
+            "RescueVault: executor change timelock not elapsed"
+        );
+
+        executor = pendingExecutor;
+        pendingExecutor = address(0);
+
+        emit ExecutorChanged(executor);
+    }
+
+    /// @inheritdoc IRescueVault
+    function cancelExecutorChange() external onlyOwner {
+        pendingExecutor = address(0);
+        executorChangeRequestTime = 0;
+
+        emit ExecutorChangeCancelled();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -215,7 +310,9 @@ contract RescueVault is IRescueVault {
     function confirmWhitelistAdd(address account) external onlyOwner {
         uint256 requestedAt = pendingWhitelistAdd[account];
         require(requestedAt != 0, "RescueVault: no pending whitelist add");
-        require(block.timestamp >= requestedAt + WHITELIST_CHANGE_DELAY, "RescueVault: whitelist add timelock not elapsed");
+        require(
+            block.timestamp >= requestedAt + WHITELIST_CHANGE_DELAY, "RescueVault: whitelist add timelock not elapsed"
+        );
 
         whitelist[account] = true;
         delete pendingWhitelistAdd[account];
@@ -250,22 +347,64 @@ contract RescueVault is IRescueVault {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev `transferFrom` that tolerates non-standard ERC-20 tokens (USDT-style,
-     *      which return no data). A failed call bubbles up the original revert
-     *      reason so the reason string of the offending token is not lost.
+     * @dev Rescues a single token in isolation. Every failure mode — unreachable
+     *      code, reverting `balanceOf`, malformed return data, reverting or
+     *      gas-burning `transferFrom` — is reported as an event and skipped.
+     *      Nothing here can revert the batch.
      */
-    function _safeTransferFrom(address token, address from, address to, uint256 amount) private {
-        (bool success, bytes memory returndata) =
-            token.call(abi.encodeCall(IERC20.transferFrom, (from, to, amount)));
+    function _rescueOne(address token, bool chargeFee) private {
+        (bool balanceOk, bytes memory balanceData) =
+            token.staticcall{gas: BALANCE_GAS_LIMIT}(abi.encodeCall(IERC20.balanceOf, (owner)));
 
-        if (!success) {
-            assembly ("memory-safe") {
-                revert(add(returndata, 0x20), mload(returndata))
+        if (!balanceOk || balanceData.length < 32) {
+            emit RescueSkipped(token, REASON_BALANCE_OF);
+            return;
+        }
+
+        uint256 balance = abi.decode(balanceData, (uint256));
+        if (balance == 0) {
+            emit RescueSkipped(token, REASON_ZERO_BALANCE);
+            return;
+        }
+
+        // Watch-set tokens (chargeFee == false) go to quarantine so that the cold
+        // wallet stays clean; with no quarantine configured they fall back to the
+        // safe address, which is the default single-destination behaviour.
+        address destination = (!chargeFee && quarantineAddress != address(0)) ? quarantineAddress : safeAddress;
+
+        uint256 fee = chargeFee ? ((balance * feeBps) / BPS_DENOMINATOR) : 0;
+        uint256 amount = balance - fee;
+
+        if (amount != 0) {
+            if (!_safeTransferFrom(token, owner, destination, amount)) {
+                emit RescueFailed(token, amount);
+                return;
             }
         }
 
-        if (returndata.length != 0 && !abi.decode(returndata, (bool))) {
-            revert TransferFromFailed(token, from, to, amount);
+        // The fee is best effort: the assets are already safe at this point, so a
+        // failing fee transfer is reported rather than reverting the whole batch.
+        if (fee != 0 && !_safeTransferFrom(token, owner, feeReceiver, fee)) {
+            emit RescueFailed(token, fee);
         }
+
+        emit Rescued(token, amount, destination);
+    }
+
+    /**
+     * @dev `transferFrom` with a bounded gas stipend and a tolerant return check:
+     *      an empty return (USDT-style) counts as success, anything shorter than
+     *      32 bytes counts as failure, and a `false` return counts as failure.
+     *      Never reverts.
+     */
+    function _safeTransferFrom(address token, address from, address to, uint256 amount) private returns (bool) {
+        (bool success, bytes memory returndata) =
+            token.call{gas: TOKEN_GAS_LIMIT}(abi.encodeCall(IERC20.transferFrom, (from, to, amount)));
+
+        if (!success) return false;
+        if (returndata.length == 0) return true;
+        if (returndata.length < 32) return false;
+
+        return abi.decode(returndata, (bool));
     }
 }

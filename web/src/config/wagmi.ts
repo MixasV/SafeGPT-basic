@@ -22,8 +22,8 @@ const connectors = connectorsForWallets([{ groupName: "Supported wallets", walle
 });
 
 /**
- * Sprint 1 ships Ethereum mainnet + Base. Multi-chain monitoring for
- * safegpt-platform lands in Sprint 7.
+ * Sprint 1 ships Ethereum mainnet + Base. Additional networks are added per
+ * release as the self-hosted bot gains multi-chain support.
  */
 export const wagmiConfig = createConfig({
   chains: [mainnet, base],

@@ -42,9 +42,7 @@ contract Deploy is Script {
         vm.startBroadcast(executorPrivateKey);
 
         factory = new RescueVaultFactory();
-        vault = RescueVault(
-            factory.createVault(protectedWallet, safeAddress, executor, feeReceiver, feeBps, salt)
-        );
+        vault = RescueVault(factory.createVault(protectedWallet, safeAddress, executor, feeReceiver, feeBps, salt));
 
         vm.stopBroadcast();
 
