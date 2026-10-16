@@ -1,0 +1,39 @@
+{
+  "network": "ethereum",
+  "rpcUrl": "wss://your-node.example/ws",
+  "chainId": 1,
+  "protectedWallet": "0x0000000000000000000000000000000000000000",
+  "safeAddress": "0x0000000000000000000000000000000000000000",
+  "vaultAddress": "0x0000000000000000000000000000000000000000",
+  "executorPrivateKey": "ENV:EXECUTOR_KEY",
+  "tokens": [
+    {
+      "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "symbol": "USDC",
+      "decimals": 6,
+      "rescueThreshold": "1000000"
+    }
+  ],
+  "whitelist": ["0x0000000000000000000000000000000000000000"],
+  "rules": {
+    "rescueOnApproveToUnknown": true,
+    "rescueOnTransferToNonWhitelist": true,
+    "rescueOnContractCallToNonWhitelist": true,
+    "rescueOnEIP7702Delegation": true,
+    "rescueOnMassTransfers": {
+      "enabled": true,
+      "maxTransfers": 3,
+      "windowMinutes": 5
+    },
+    "alertOnRevokeApprove": true,
+    "revokeGracePeriodMinutes": 5
+  },
+  "alerts": {
+    "telegramBotToken": "ENV:TG_BOT_TOKEN",
+    "telegramChatId": "ENV:TG_CHAT_ID"
+  },
+  "gasStrategy": {
+    "priorityFeeMultiplier": 1.5,
+    "maxGasPrice": "100000000000"
+  }
+}
