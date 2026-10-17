@@ -121,8 +121,14 @@ interface IRescueVault {
     /// @notice Timestamp of the pending whitelist removal for `account`, or 0.
     function pendingWhitelistRemove(address account) external view returns (uint256);
 
-    /// @notice Delay that must elapse before a safe/quarantine/executor change is applied.
+    /// @notice Delay that must elapse before a safe address change is applied.
     function SAFE_CHANGE_DELAY() external view returns (uint256);
+
+    /// @notice Delay that must elapse before an executor change is applied.
+    function EXECUTOR_CHANGE_DELAY() external view returns (uint256);
+
+    /// @notice Delay that must elapse before a quarantine address change is applied.
+    function QUARANTINE_CHANGE_DELAY() external view returns (uint256);
 
     /// @notice Delay that must elapse before a whitelist change can be confirmed.
     function WHITELIST_CHANGE_DELAY() external view returns (uint256);

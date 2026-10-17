@@ -677,7 +677,7 @@ contract RescueVaultTest is Test {
 
         vm.prank(ownerAddr);
         vault.requestQuarantineChange(quarantine);
-        vm.warp(block.timestamp + vault.SAFE_CHANGE_DELAY());
+        vm.warp(block.timestamp + vault.QUARANTINE_CHANGE_DELAY());
         vm.prank(ownerAddr);
         vault.confirmQuarantineChange();
         assertEq(vault.quarantineAddress(), quarantine);
@@ -712,7 +712,7 @@ contract RescueVaultTest is Test {
         assertEq(vault.pendingExecutor(), newExecutor);
         assertEq(vault.executorChangeRequestTime(), block.timestamp);
 
-        vm.warp(block.timestamp + vault.SAFE_CHANGE_DELAY() - 1);
+        vm.warp(block.timestamp + vault.EXECUTOR_CHANGE_DELAY() - 1);
 
         vm.prank(ownerAddr);
         vm.expectRevert("RescueVault: executor change timelock not elapsed");
@@ -726,7 +726,7 @@ contract RescueVaultTest is Test {
 
         vm.prank(ownerAddr);
         vault.requestExecutorChange(newExecutor);
-        vm.warp(block.timestamp + vault.SAFE_CHANGE_DELAY());
+        vm.warp(block.timestamp + vault.EXECUTOR_CHANGE_DELAY());
 
         vm.prank(ownerAddr);
         vault.confirmExecutorChange();
@@ -746,7 +746,7 @@ contract RescueVaultTest is Test {
         assertEq(vault.pendingExecutor(), address(0));
         assertEq(vault.executorChangeRequestTime(), 0);
 
-        vm.warp(block.timestamp + vault.SAFE_CHANGE_DELAY());
+        vm.warp(block.timestamp + vault.EXECUTOR_CHANGE_DELAY());
         vm.prank(ownerAddr);
         vm.expectRevert("RescueVault: no pending executor change");
         vault.confirmExecutorChange();

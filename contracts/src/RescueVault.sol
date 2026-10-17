@@ -37,8 +37,14 @@ contract RescueVault is IRescueVault {
                                 CONSTANTS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Delay that must elapse before a safe, quarantine or executor change is applied.
+    /// @notice Delay that must elapse before a safe address change is applied.
     uint256 public constant SAFE_CHANGE_DELAY = 72 hours;
+
+    /// @notice Delay that must elapse before an executor change is applied.
+    uint256 public constant EXECUTOR_CHANGE_DELAY = 72 hours;
+
+    /// @notice Delay that must elapse before a quarantine address change is applied.
+    uint256 public constant QUARANTINE_CHANGE_DELAY = 72 hours;
 
     /// @notice Delay that must elapse before a whitelist change is applied.
     uint256 public constant WHITELIST_CHANGE_DELAY = 72 hours;
@@ -241,7 +247,7 @@ contract RescueVault is IRescueVault {
     function confirmQuarantineChange() external onlyOwner {
         require(pendingQuarantineAddress != address(0), "RescueVault: no pending quarantine change");
         require(
-            block.timestamp >= quarantineChangeRequestTime + SAFE_CHANGE_DELAY,
+            block.timestamp >= quarantineChangeRequestTime + QUARANTINE_CHANGE_DELAY,
             "RescueVault: quarantine change timelock not elapsed"
         );
 
@@ -277,7 +283,7 @@ contract RescueVault is IRescueVault {
     function confirmExecutorChange() external onlyOwner {
         require(pendingExecutor != address(0), "RescueVault: no pending executor change");
         require(
-            block.timestamp >= executorChangeRequestTime + SAFE_CHANGE_DELAY,
+            block.timestamp >= executorChangeRequestTime + EXECUTOR_CHANGE_DELAY,
             "RescueVault: executor change timelock not elapsed"
         );
 
