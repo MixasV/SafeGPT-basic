@@ -20,10 +20,15 @@ are deterministic rules — no AI, no LLM, ever in the rescue path.
 
 | Component | Status |
 |---|---|
-| `contracts/` — RescueVault + factory, 16 Foundry tests | ✅ Done (Sprint 1) |
+| `contracts/` — RescueVault (Variant A), 27 Foundry tests | ✅ Done (Sprints 1–2) |
+| `contracts/` — SafeGPTGuardianModule (Variant B), 27 Foundry tests | ✅ Done (Sprint 2) |
 | `bot/` — mempool monitor, rules, executor, alerts | ⏳ Sprint 3 |
-| `web/` — onboarding wizard, dashboard, settings | 🚧 Shell + mode switcher (Sprint 1), features in Sprints 2 and 4 |
+| `web/` — onboarding wizard, 7 steps, Demo Mode, E2E tested | ✅ Done (Sprint 2) |
+| `web/` — dashboard | ⏳ Sprint 4 |
 | `docs/` — SETUP / ARCHITECTURE / SECURITY | ⏳ Sprint 8 |
+
+**54 Foundry tests pass** (27 + 27). Playwright E2E covers the onboarding wizard
+end to end in Demo Mode.
 
 ---
 
@@ -53,7 +58,7 @@ safegpt-core/
 ```bash
 cd contracts
 forge build
-forge test          # 16 tests
+forge test          # 54 tests: 27 RescueVault + 27 GuardianModule
 ```
 
 ### Web dashboard
@@ -77,13 +82,80 @@ npm run build:demo     # .env.demo → VITE_DEMO_MODE=true
 npm run preview
 ```
 
-The whole onboarding wizard — connect, drainer check, safe address, asset scan,
-vault deploy, approvals, protection active — runs end to end with no wallet, no
-gas and no real transaction. Use it for demos and for the grant video.
+The whole onboarding wizard — connect, drainer check, safe address, safe-wallet
+signature, asset scan with Core/Watch classification, vault deploy, approvals,
+protection active — runs end to end with no wallet, no gas and no real
+transaction. Use it for demos and for the grant video.
 
 ```bash
 npm run test:e2e       # Playwright, runs the demo build in your local Chrome
 ```
+
+## The two protection variants
+
+SafeGPT ships two independent contracts. Pick per wallet; they are not layered
+on each other.
+
+| | Variant A — `RescueVault` | Variant B — `SafeGPTGuardianModule` |
+|---|---|---|
+| Model | Rescue before the attack | Timelock + veto on every action |
+| Who can move funds | The bot (`executor`), only to the safe address | Nobody alone — the guardian must confirm |
+| You approve the contract | Yes (ERC-20 allowances) | No; it holds the assets directly |
+| Compromised owner key | Bot still rescues; approvals can be revoked | **Cannot act alone** — the guardian blocks everything |
+| Compromised guardian key | n/a | Can veto and approve, cannot move funds; 5 confirms/hour |
+| Extra dependency | None | A second key on separate hardware |
+| Best for | Earning from the service fee | Users who will not accept any custody assumption |
+
+### Variant A — RescueVault
+
+The bot watches the mempool, sees a suspicious transaction leaving your wallet,
+and front-runs it with a higher-gas transaction that moves your approved tokens to
+the safe address.
+
+**Deploy:**
+
+```bash
+cd contracts
+export EXECUTOR_PRIVATE_KEY=0x...      # bot key; its address becomes the executor
+export PROTECTED_WALLET=0x...         # cold-storage wallet to protect
+export SAFE_ADDRESS=0x...             # rescue destination, must differ from PROTECTED_WALLET
+export FEE_RECEIVER=0x...             # service fee recipient
+export FEE_BPS=500                     # 5%, hard cap 1000 (10%)
+export VAULT_SALT=0x...               # 32-byte CREATE2 salt
+
+forge script script/Deploy.s.sol:Deploy --rpc-url "$RPC_URL" --broadcast
+```
+
+Or deploy from the onboarding wizard (step 4.5), which uses the same bytecode.
+
+### Variant B — SafeGPTGuardianModule
+
+The assets live in the contract itself, so no approvals are needed. The owner
+queues an action and nothing happens until a second, independent key — the
+guardian — confirms it. There is no timer: a queued transaction waits forever
+until the guardian acts. That is the intended failure mode, not a bug.
+
+**Deploy:**
+
+```bash
+cd contracts
+export DEPLOYER_PRIVATE_KEY=0x...
+export MODULE_OWNER=0x...       # owner of this smart account
+export GUARDIAN_ADDRESS=0x...   # guardian key for THIS wallet only
+export SAFE_ADDRESS=0x...       # where emergencyExit() sends everything
+
+forge script script/DeployGuardian.s.sol:DeployGuardian --rpc-url "$RPC_URL" --broadcast
+```
+
+**The guardian key must be unique per wallet.** A single shared guardian key would
+mean one compromise controls every account, which defeats the entire design. In
+the open-source build each user generates their own key and stores it on separate
+hardware.
+
+**Leaving the service:** `emergencyExit()` is the only way out. It sweeps every
+asset to the safe address, removes the guardian and cancels the queue. There is no
+`removeGuardian()` and nothing happens automatically — re-protecting means running
+the onboarding again.
 
 ### Bot (after Sprint 3)
 
@@ -107,29 +179,9 @@ JSON has no comments, so this table is the reference for those fields.
 
 ---
 
-## Deploying a vault
-
-```bash
-cd contracts
-export EXECUTOR_PRIVATE_KEY=0x...      # bot key; its address becomes the executor
-export PROTECTED_WALLET=0x...         # cold-storage wallet to protect
-export SAFE_ADDRESS=0x...             # rescue destination, must differ from PROTECTED_WALLET
-export FEE_RECEIVER=0x...             # service fee recipient
-export FEE_BPS=500                     # 5%, hard cap 1000 (10%)
-export VAULT_SALT=0x...               # 32-byte CREATE2 salt
-
-forge script script/Deploy.s.sol:Deploy --rpc-url "$RPC_URL" --broadcast
-```
-
-Then, from the protected wallet, approve each protected ERC-20 to the vault.
-Until a token is approved, the vault cannot move it.
-
-**Native ETH cannot be protected** — the vault only moves ERC-20 tokens. Wrap to
-WETH first.
-
----
-
 ## Security model
+
+### Variant A — RescueVault
 
 * `rescue()` is callable **only** by `executor`, and can send funds **only** to
   the `safeAddress` and `feeReceiver` stored in the contract.
@@ -148,8 +200,46 @@ WETH first.
   that unverified airdrops never reach the cold wallet.
 * Every user runs the **same contract bytecode** — only constructor arguments
   differ (deployed via CREATE2 by the factory).
+* Then, from the protected wallet, approve each protected ERC-20 to the vault.
+  Until a token is approved, the vault cannot move it.
+* **Native ETH cannot be protected** — the vault only moves ERC-20 tokens. Wrap to
+  WETH first.
 * Known accepted trade-offs are recorded in `docs/SECURITY.md` (Sprint 8):
   fee-on-transfer tokens deliver less than the nominal amount.
+
+### Variant B — SafeGPTGuardianModule
+
+* **Nothing executes without an explicit guardian confirmation.** There is no
+  timeout and no timer that can execute or expire a queued transaction. A silent
+  guardian stalls the wallet — that is the intended failure mode.
+* Two exceptions, both deliberate: a transaction to a whitelisted destination
+  executes immediately, and `emergencyExit()` sweeps everything.
+* `emergencyExit()` is safe under a stolen owner key: its only destination is the
+  safe address, which the attacker does not control. An attacker who calls it is
+  helping the user.
+* The safe address is whitelisted from construction and can **never** be
+  unlisted, so funds always have an exit path.
+* Safe-address and whitelist changes each require owner request → guardian
+  approval → 72h timelock → owner confirmation. Re-issuing a request invalidates
+  any earlier approval.
+* Guardian confirms are rate limited to 5 per hour, so a leaked guardian key
+  cannot green-light a whole batch.
+* The queue is capped at `MAX_QUEUE_SIZE = 200` so the emergency exit always fits
+  in one transaction's gas budget. Cancelling entries frees room.
+* The guardian cannot initiate a transaction, execute one, call `emergencyExit`,
+  move funds, or change the owner, safe address or whitelist.
+* Leaving the service is only possible through `emergencyExit()`. There is no
+  `removeGuardian()`.
+
+### How the contracts were reviewed
+
+Both contracts were reviewed by the ChainGPT Smart Contract Auditor **and** by
+manual verification against a security checklist. The automated pass alone is not
+sufficient: during the guardian module review it reported "no vulnerabilities"
+across every category while two real defects were present — an unbounded queue
+that could permanently block the emergency exit, and a stale guardian approval
+that survived `emergencyExit()`. Both were found by hand and fixed. Treat the
+auditor as a first pass, never as the only gate.
 
 ---
 

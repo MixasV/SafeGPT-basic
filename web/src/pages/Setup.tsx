@@ -176,6 +176,7 @@ export function Setup() {
         return (
           <StepSafeAddress
             protectedWallet={account}
+            safeWalletClient={walletClient?.account ? walletClient : undefined}
             onBack={() => goTo(activeIndex - 1)}
             onContinue={() => {
               void refreshNativeBalance();

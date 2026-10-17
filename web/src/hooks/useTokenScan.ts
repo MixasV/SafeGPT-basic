@@ -12,6 +12,7 @@ import { arbitrum, base, mainnet, sepolia } from "viem/chains";
 
 import { DEMO_MODE } from "../config/demo";
 import { erc20Abi, rescueVaultAbi } from "../config/contracts";
+import { findTokenOnOtherChains, isVerifiedToken } from "../config/verified-tokens";
 import type { TokenInfo } from "../config/tokens";
 import { useOnboardingStore } from "../state/onboarding";
 
@@ -206,7 +207,9 @@ export function useTokenScan() {
       if (DEMO_MODE) {
         const { DEMO_BALANCES, DEMO_TOKENS } = await import("../config/tokens");
         const tokens: ScannedToken[] = DEMO_TOKENS.map((info) => ({
-          ...info,
+          address: info.address,
+          symbol: info.symbol,
+          decimals: info.decimals,
           balance: BigInt(DEMO_BALANCES[info.address.toLowerCase()] ?? "0"),
         })).filter((token) => token.balance > 0n);
         setSource("demo");
@@ -251,7 +254,7 @@ export function useTokenScan() {
   );
 
   const applyToStore = useCallback(
-    (result: ScanResult) => {
+    (result: ScanResult, chainId: number) => {
       setAssets(
         result.tokens.map((token) => ({
           address: token.address,
@@ -259,48 +262,70 @@ export function useTokenScan() {
           decimals: token.decimals,
           balance: token.balance.toString(),
           selected: true,
-          verified: source !== "bundled" || !isUnverifiedAddress(token.address),
+          // Core requires membership of the curated list for THIS network.
+          // Anything else lands in the Watch set and is rescued fee-free to the
+          // quarantine address (UPD-2).
+          verified: isVerifiedToken(token.address, chainId),
         })),
       );
     },
-    [setAssets, source],
+    [setAssets],
   );
 
   return { scan, applyToStore, loading, source, error, setError };
 }
 
-/**
- * Addresses below `0x1000` are the Demo Mode placeholders and never a real
- * deployment, so they are treated as unverified watch-set entries.
- */
-function isUnverifiedAddress(address: string): boolean {
-  return /^0x0{36}[0-9a-f]{4}$/i.test(address) || Number.parseInt(address.slice(2), 16) < 0x10000;
+export interface ManualTokenValidation {
+  ok: boolean;
+  token?: TokenInfo;
+  /** Whether the address is in the curated list for this network. */
+  verified: boolean;
+  warnings: string[];
 }
 
-/** Validates a manually entered token address per the UPD-2 checklist. */
-export async function validateManualToken(
-  address: string,
-  chainId: number,
-): Promise<{ ok: boolean; token?: TokenInfo; warnings: string[] }> {
+/**
+ * Validates a manually entered token address per the UPD-2 / section 6 checklist:
+ * it must be a contract on THIS network, and it is only promoted to the Core set
+ * when it is in the curated list. An address known on another network is called
+ * out explicitly so pasting the wrong chain's token is obvious.
+ */
+export async function validateManualToken(address: string, chainId: number): Promise<ManualTokenValidation> {
   const warnings: string[] = [];
 
   if (!isAddress(address)) {
-    return { ok: false, warnings: ["Not a valid EVM address."] };
+    return { ok: false, verified: false, warnings: ["Not a valid EVM address."] };
   }
+
+  const verified = isVerifiedToken(address, chainId);
 
   const client = publicClientFor(chainId);
   const code = await client.getCode({ address });
   if (!code || code === "0x") {
-    return { ok: false, warnings: ["No contract found at this address."] };
+    // A curated token from another network is the most likely mistake here.
+    const elsewhere = findTokenOnOtherChains(address, chainId);
+    if (elsewhere.length > 0) {
+      const where = elsewhere.map((entry) => `${entry.symbol} on chain ${entry.chainId}`).join(", ");
+      return {
+        ok: false,
+        verified: false,
+        warnings: [`No contract at this address on the selected network. This is ${where} — the same token has a different address per network.`],
+      };
+    }
+    return { ok: false, verified: false, warnings: ["No contract found at this address on the selected network."] };
   }
 
   const info = await readTokenMetadata(client, address);
   if (info.symbol === "UNKNOWN") {
     warnings.push("The token does not expose symbol() or decimals() — it may be non-standard.");
   }
-  warnings.push("Unverified contracts are rescued without a fee and routed to the quarantine address.");
 
-  return { ok: true, token: info, warnings };
+  if (verified) {
+    warnings.push("Found in the curated verified list for this network. It will be protected in the Core set.");
+  } else {
+    warnings.push("Not in the curated verified list. It will be protected in the Watch set: rescued without a fee, in a separate transaction, and routed to the quarantine address.");
+  }
+
+  return { ok: true, token: info, verified, warnings };
 }
 
 /** Calldata for a single ERC-20 approve, shown in Pro mode. */
