@@ -5,8 +5,11 @@ and a three-route operator UI. It runs on your machine, against your RPC, with
 your keys. It does not phone home and it does not need an account.
 
 The hosted, managed version — subscriptions, multi-chain monitoring, the ChainGPT
-assistant and auditor — is a separate, proprietary repository,
-[`safegpt-platform`](https://github.com/safegpt/safegpt-platform).
+assistant and auditor — is a separate, proprietary repository.
+Public repo: `https://github.com/MixasV/SafeGPT-basic`. Hosted service is in
+waitlist mode (Basic/Pro/Guardian+ — join waitlist; test billing disabled;
+admin grant `POST /api/admin/subscriptions/grant` available only to
+operator via `ADMIN_ADDRESSES`).
 
 SafeGPT is a **security tool**, not a trading platform. It does not execute
 trades, provide financial advice, or manage investment portfolios.
