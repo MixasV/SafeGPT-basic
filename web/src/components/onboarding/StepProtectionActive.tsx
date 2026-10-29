@@ -14,7 +14,7 @@ interface StepProtectionActiveProps {
   assets: SelectedAsset[];
 }
 
-/** Step 6 — Confirmation screen. */
+/** Step 6 → Confirmation screen. */
 export function StepProtectionActive({
   onFinish,
   chainId,

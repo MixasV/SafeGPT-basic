@@ -51,6 +51,24 @@ export interface SelectedAsset {
 
 export type DrainerStatus = "idle" | "awaiting-deposit" | "checking" | "clean" | "compromised";
 
+/** Rule thresholds, mirrored into the bot configuration. See StepProConfig. */
+export interface RuleSettings {
+  rescueOnApproveToUnknown: boolean;
+  rescueOnTransferToNonWhitelist: boolean;
+  rescueOnContractCallToNonWhitelist: boolean;
+  rescueOnEIP7702Delegation: boolean;
+  massTransfersMax: number;
+  massTransfersWindowMin: number;
+  revokeGracePeriodMin: number;
+}
+
+/** Alert channels. Values live in the operator's own bot config, never on a server. */
+export interface AlertSettings {
+  telegramBotToken: string;
+  telegramChatId: string;
+  webhookUrl: string;
+}
+
 interface OnboardingState {
   step: WizardStepId;
   safeAddress: string;
@@ -64,6 +82,12 @@ interface OnboardingState {
   drainerStatus: DrainerStatus;
   drainerDetail: string;
   nativeBalanceWei: bigint;
+  /** Pro step: addresses the bot treats as trusted. */
+  whitelist: string[];
+  /** Pro step: rule thresholds written to the bot config. */
+  rules: RuleSettings;
+  /** Pro step: alert channels. */
+  alertsConfig: AlertSettings;
   completed: boolean;
 
   setStep: (step: WizardStepId) => void;
@@ -80,6 +104,9 @@ interface OnboardingState {
   addManualAsset: (asset: SelectedAsset) => void;
   setDrainer: (status: DrainerStatus, detail: string, nativeBalanceWei?: bigint) => void;
   setNativeBalance: (wei: bigint) => void;
+  setWhitelist: (addresses: string[]) => void;
+  setRules: (rules: RuleSettings) => void;
+  setAlertsConfig: (alerts: AlertSettings) => void;
   complete: () => void;
   reset: () => void;
 }
@@ -96,6 +123,21 @@ const INITIAL = {
   drainerStatus: "idle" as DrainerStatus,
   drainerDetail: "",
   nativeBalanceWei: 0n,
+  whitelist: [] as string[],
+  rules: {
+    rescueOnApproveToUnknown: true,
+    rescueOnTransferToNonWhitelist: true,
+    rescueOnContractCallToNonWhitelist: true,
+    rescueOnEIP7702Delegation: true,
+    massTransfersMax: 3,
+    massTransfersWindowMin: 5,
+    revokeGracePeriodMin: 5,
+  } as RuleSettings,
+  alertsConfig: {
+    telegramBotToken: "",
+    telegramChatId: "",
+    webhookUrl: "",
+  } as AlertSettings,
   completed: false,
 };
 
@@ -143,6 +185,9 @@ export const useOnboardingStore = create<OnboardingState>()(
           nativeBalanceWei: nativeBalanceWei ?? state.nativeBalanceWei,
         })),
       setNativeBalance: (nativeBalanceWei) => set({ nativeBalanceWei }),
+      setWhitelist: (whitelist) => set({ whitelist }),
+      setRules: (rules) => set({ rules }),
+      setAlertsConfig: (alertsConfig) => set({ alertsConfig }),
       complete: () => set({ completed: true }),
       reset: () => set({ ...INITIAL }),
     }),

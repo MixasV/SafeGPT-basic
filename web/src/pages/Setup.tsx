@@ -7,6 +7,7 @@ import { StepApproveProtection } from "../components/onboarding/StepApproveProte
 import { StepConnectWallet } from "../components/onboarding/StepConnectWallet";
 import { StepDeployProtection } from "../components/onboarding/StepDeployProtection";
 import { StepDrainerCheck } from "../components/onboarding/StepDrainerCheck";
+import { StepAlerts, StepRules, StepWhitelist } from "../components/onboarding/StepProConfig";
 import { StepProtectionActive } from "../components/onboarding/StepProtectionActive";
 import { StepSafeAddress } from "../components/onboarding/StepSafeAddress";
 import { StepSelectAssets } from "../components/onboarding/StepSelectAssets";
@@ -17,7 +18,8 @@ import { DEMO_ADDRESSES } from "../config/tokens";
 import { useApprovalFlow } from "../hooks/useApprovalFlow";
 import { useMode } from "../hooks/useMode";
 import { useVaultDeploy } from "../hooks/useVaultDeploy";
-import { BEGINNER_STEPS, useOnboardingStore, type WizardStepId } from "../state/onboarding";
+import { BEGINNER_STEPS, PRO_STEPS, useOnboardingStore, type WizardStepId } from "../state/onboarding";
+import { trackEvent } from "../utils/analytics";
 
 const STEP_META: Record<WizardStepId, { title: string; description: string }> = {
   connect: { title: "Connect wallet", description: "Pick the wallet to protect" },
@@ -100,11 +102,26 @@ export function Setup() {
 
   const goTo = useCallback(
     (index: number) => {
-      const target = BEGINNER_STEPS[index];
+      // Indexes span the Beginner list plus, in Pro mode, the configuration
+      // steps. Looking only at BEGINNER_STEPS made every Pro step unreachable.
+      const ids = mode === "pro" ? [...BEGINNER_STEPS, ...PRO_STEPS] : BEGINNER_STEPS;
+      const target = ids[index];
       if (target) setStep(target);
     },
-    [setStep],
+    [setStep, mode],
   );
+
+  /** Ends the wizard from any step, Pro or Beginner. */
+  const finishWizard = useCallback(() => {
+    complete();
+    trackEvent("onboarding_completed", {
+      chainId,
+      tokensCount: store.assets.filter((asset) => asset.selected).length,
+      coreCount: store.assets.filter((asset) => asset.selected && asset.verified).length,
+      watchCount: store.assets.filter((asset) => asset.selected && !asset.verified).length,
+    });
+    navigate("/dashboard");
+  }, [chainId, complete, navigate, store.assets]);
 
   const wrapEth = useCallback(
     async (amount: bigint) => {
@@ -145,24 +162,33 @@ export function Setup() {
     [chainId, publicClient, refreshNativeBalance, walletClient],
   );
 
-  const steps = useMemo(
-    () =>
-      BEGINNER_STEPS.map((id) => ({
-        id,
-        title: STEP_META[id].title,
-        description: STEP_META[id].description,
-        content: null,
-        complete:
-          (id === "connect" && Boolean(account)) ||
-          (id === "drainer" && store.drainerStatus === "clean") ||
-          (id === "safe-address" && safeAddress !== "") ||
-          (id === "assets" && assets.some((asset) => asset.selected)) ||
-          (id === "deploy" && vaultAddress !== "") ||
-          (id === "approve" && approval.finished && approval.progress.some((p) => p.state === "approved")) ||
-          (id === "active" && store.completed),
-      })),
-    [account, approval.finished, approval.progress, assets, safeAddress, store.completed, store.drainerStatus, vaultAddress],
-  );
+  const steps = useMemo(() => {
+    // Pro mode appends its configuration steps after protection is live. They
+    // were defined in the store but never added to the list, so a Pro user saw
+    // a sentence promising three steps and no way to reach them.
+    const ids = mode === "pro" ? [...BEGINNER_STEPS, ...PRO_STEPS] : BEGINNER_STEPS;
+
+    return ids.map((id) => ({
+      id,
+      title: STEP_META[id].title,
+      description: STEP_META[id].description,
+      content: null,
+      // Pro steps configure the operator's own bot; they gate nothing, so they
+      // must be reachable before they can be filled in.
+      ...(PRO_STEPS.includes(id) ? { optional: true } : {}),
+      complete:
+        (id === "connect" && Boolean(account)) ||
+        (id === "drainer" && store.drainerStatus === "clean") ||
+        (id === "safe-address" && safeAddress !== "") ||
+        (id === "assets" && assets.some((asset) => asset.selected)) ||
+        (id === "deploy" && vaultAddress !== "") ||
+        (id === "approve" && approval.finished && approval.progress.some((p) => p.state === "approved")) ||
+        (id === "active" && store.completed) ||
+        (id === "whitelist" && store.whitelist.length > 0) ||
+        (id === "alerts" && (store.alertsConfig.telegramChatId !== "" || store.alertsConfig.webhookUrl !== "")) ||
+        id === "rules",
+    }));
+  }, [account, approval.finished, approval.progress, assets, mode === "pro", safeAddress, store.alertsConfig, store.completed, store.drainerStatus, store.whitelist.length, vaultAddress]);
 
   const renderStep = () => {
     switch (step) {
@@ -253,6 +279,15 @@ export function Setup() {
             }}
           />
         );
+
+      case "whitelist":
+        return <StepWhitelist onBack={() => goTo(activeIndex - 1)} onFinish={finishWizard} />;
+
+      case "rules":
+        return <StepRules onBack={() => goTo(activeIndex - 1)} onFinish={finishWizard} />;
+
+      case "alerts":
+        return <StepAlerts onBack={() => goTo(activeIndex - 1)} onFinish={finishWizard} />;
 
       default:
         return null;

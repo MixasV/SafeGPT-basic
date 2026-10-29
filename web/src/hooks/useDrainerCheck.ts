@@ -1,8 +1,9 @@
-﻿import { useCallback, useState } from "react";
+import { useCallback, useState } from "react";
 import type { Address, PublicClient } from "viem";
 
 import { DEMO_MODE } from "../config/demo";
 import { useOnboardingStore } from "../state/onboarding";
+import { trackEvent } from "../utils/analytics";
 
 export interface DrainerCheckResult {
   status: "clean" | "compromised";
@@ -129,13 +130,17 @@ export function useDrainerCheck(publicClient: PublicClient | undefined, account:
       if (balance <= balanceBefore) {
         const message = "ETH deposit disappeared within 2 blocks. Active drainer detected.";
         setDrainer("compromised", message, balance);
-        return { status: "compromised", message, depositedWei: 0n };
+        // Grant reporting counts how many wallets arrive already compromised — the
+    // clearest signal that the check is doing its job.
+    trackEvent("drainer_check_failed", { errorKind: "balance-dropped" });
+    return { status: "compromised", message, depositedWei: 0n };
       }
 
       const deposited = balance - balanceBefore;
       const message = "No active drainer detected. Proceeding with setup.";
       setDrainer("clean", message, balance);
-      return { status: "clean", message, depositedWei: deposited };
+      trackEvent("drainer_check_passed", {});
+    return { status: "clean", message, depositedWei: deposited };
     } catch (cause) {
       setPhase("idle");
       setError(asError(cause, "The drainer check failed."));

@@ -1,0 +1,75 @@
+﻿# SafeGPT rescue bot — example configuration.
+#
+# Every `ENV:NAME` string is replaced with the matching environment variable at
+# startup, so private keys never live in this file:
+#
+#   export EXECUTOR_KEY=0x...
+#   export GUARDIAN_KEY=0x...
+#   npm run bot -- --config config.example.yaml --dry-run
+#
+# `ENV:NAME` (required) fails loudly if the variable is missing. `ENV_OPT:NAME`
+# resolves to an empty string instead, which is what an optional alert channel
+# needs — you do not have to hand-edit this file to run without Telegram.
+
+rpcWss: "wss://sepolia.infura.io/ws/v3/YOUR_KEY"
+rpcHttp: "https://sepolia.infura.io/v3/YOUR_KEY"
+chainId: 11155111
+
+# Optional. Empty means rescue transactions go through the public mempool.
+flashbotsRelay: ""
+
+wallets:
+  - label: "Main wallet"
+    protectedWallet: "0x1111111111111111111111111111111111111111"
+    safeAddress: "0x2222222222222222222222222222222222222222"
+    vaultAddress: "0x3333333333333333333333333333333333333333"
+    variant: "A" # A = RescueVault (bot as executor), B = GuardianModule (bot as guardian)
+
+    # Required for variant A. The address derived from this key must equal the
+    # vault's `executor`; the bot refuses to send a rescue otherwise.
+    executorPrivateKey: "ENV:EXECUTOR_KEY"
+
+    # Verified assets. `rescueThreshold` is a RAW amount in the token's smallest
+    # unit. Omit it to trigger on any transfer to a non-whitelisted address —
+    # stricter, which is the right default for a cold-storage wallet.
+    coreTokens:
+      - address: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238" # USDC (Sepolia)
+        symbol: "USDC"
+        decimals: 6
+        rescueThreshold: "1000000" # 1 USDC
+
+    # Pre-registered / unverified tokens. Rescued WITHOUT a fee, in a separate
+    # transaction, and routed to the vault's quarantine address.
+    watchTokens: []
+
+    # Destinations the owner legitimately interacts with. Anything else is a
+    # rescue trigger.
+    whitelist:
+      - "0x4444444444444444444444444444444444444444"
+
+    thresholds:
+      massTransferCount: 3 # more than 3 outgoing transfers…
+      massTransferWindowMin: 5 # …within 5 minutes
+      balanceDropPct: 10 # a 10% balance drop post-block triggers a rescue
+
+# For variant B use this instead of executorPrivateKey:
+#     variant: "B"
+#     guardianPrivateKey: "ENV:GUARDIAN_KEY"
+
+alerts:
+  # Telegram is the PRIMARY channel — it is what reaches you at 3am. Both
+  # values must be set together or the bot refuses to start.
+  #   1. Message @BotFather, send /newbot, copy the token.
+  #   2. Open https://t.me/<yourbot>, send any message.
+  #   3. Read your numeric chat id from https://api.telegram.org/bot<TOKEN>/getUpdates
+  #      (or message the bot and ask it for the id).
+  telegramBotToken: "ENV_OPT:TELEGRAM_BOT_TOKEN"
+  telegramChatId: "ENV_OPT:TELEGRAM_CHAT_ID"
+
+  # Optional secondary channel. Leave empty to use Telegram + console only.
+  webhookUrl: ""
+
+  # The executor must hold at least this much ETH to send a rescue. The check
+  # runs at the moment a rescue is attempted — it is a gate, not a warning.
+  # Nothing alerts you proactively if the balance drops while no rule fires.
+  minExecutorEth: 0.1

@@ -38,17 +38,21 @@ export function PrimaryButton({
   disabled,
   type = "button",
   className = "",
+  testId,
 }: {
   children: ReactNode;
   onClick?: () => void;
   disabled?: boolean;
   type?: "button" | "submit";
   className?: string;
+  /** Exposed so a step can assert on its own submit control. */
+  testId?: string;
 }) {
   return (
     <button
       type={type}
       onClick={onClick}
+      data-testid={testId}
       disabled={disabled}
       className={`rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
     >

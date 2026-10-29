@@ -7,8 +7,17 @@ export interface WizardStep {
   title: string;
   description: string;
   content: ReactNode;
-  /** A step is reachable once everything before it has been completed. */
-  complete: boolean;
+/** A step is reachable once everything before it has been completed. */
+complete: boolean;
+  /**
+   * An optional step is reachable as soon as the wizard reaches the end of the
+   * required flow, whether or not it has been filled in.
+   *
+   * Without this, the Pro configuration steps were unreachable: they are only
+   * "complete" once you configure them, and you cannot configure them until you
+   * can open them. The empty whitelist could never get its first entry.
+   */
+optional?: boolean;
   /** Optional flag rendered next to the step title. */
   status?: "active" | "alert" | "rescued" | "compromised" | "neutral";
 }
@@ -30,7 +39,7 @@ export function WizardShell({ steps, activeIndex, onNavigate, children }: Wizard
       <ol className="space-y-2">
         {steps.map((step, index) => {
           const isActive = index === activeIndex;
-          const reachable = index <= activeIndex || step.complete;
+          const reachable = index <= activeIndex || step.complete || step.optional === true;
 
           return (
             <li key={step.id}>

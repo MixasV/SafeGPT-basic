@@ -49,10 +49,11 @@ export function StepConnectWallet({ onContinue, connected }: StepConnectWalletPr
 
       <WarningBanner tone="warning">
         <p>Basic and Pro protect against the most common attacks. For maximum protection, consider Guardian+.</p>
+        {/* Points at the one place the detail lives instead of restating it.
+            Three screens carrying the same caveat trains people to skip it. */}
         <p className="mt-2">
-          A recovered SafeGPT account does not guarantee 100% safety. It significantly reduces risk: it is a
-          protection service, not insurance. Private mempool attacks, an attacker holding your private key, and
-          tokens that arrive after setup are not covered — review the limitations before you deposit.
+          Not every attack is covered — private mempools, an attacker holding your key, and tokens that
+          arrive after setup are not. See the coverage table on the pricing page before you deposit.
         </p>
       </WarningBanner>
 

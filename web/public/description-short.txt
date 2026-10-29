@@ -1,0 +1,6 @@
+SafeGPT — AI-powered crypto wallet protection.
+Detects unauthorized transactions in the public mempool and rescues funds to a
+user-defined safe address before an attacker's transaction settles.
+Built with ChainGPT AI for smart contract auditing and security analysis.
+Core contracts and rescue bot are MIT licensed and self-hostable.
+Not insurance. Not a guarantee. A risk-reduction service.

@@ -219,12 +219,24 @@ export function StepSelectAssets({
             />
             <SecondaryButton onClick={() => void addManual()}>Validate &amp; add</SecondaryButton>
           </div>
-          {manualVerified !== null && (
-            <div className="flex items-center gap-2 text-xs">
-              <TrustBadge verified={manualVerified} />
-              <StatusBadge tone={manualVerified ? "active" : "alert"} label={manualVerified ? "CORE" : "WATCH"} />
-            </div>
-          )}
+{manualVerified !== null && (
+      <div className="flex items-center gap-2 text-xs">
+        <TrustBadge verified={manualVerified} />
+        <StatusBadge tone={manualVerified ? "active" : "alert"} label={manualVerified ? "CORE" : "WATCH"} />
+      </div>
+    )}
+
+    {/* An unverified contract has no verified source, and an auditor needs
+        source rather than an address — which is precisely why it is unverified.
+        There is no auditor in this repository to link to: it is a platform
+        surface. Say the reason and stop, rather than promising a tool that is
+        not here. */}
+    {manualVerified === false && (
+      <p className="mt-2 text-xs text-accent-yellow" data-testid="unauditable-notice">
+        Contract source is not verified on an explorer, so it cannot be audited automatically. Rescue
+        coverage for this asset depends on thresholds you set above.
+      </p>
+    )}
           {manualWarnings.length > 0 && (
             <ul className="list-disc space-y-1 pl-5 text-xs text-text-secondary">
               {manualWarnings.map((warning) => (
