@@ -7,6 +7,8 @@ import { persist } from "zustand/middleware";
  * lose the deployed vault address — losing it would orphan the approvals.
  */
 export type WizardStepId =
+  | "how-it-works"
+  | "quiz"
   | "connect"
   | "drainer"
   | "chaingpt"
@@ -22,6 +24,8 @@ export type WizardStepId =
   | "alerts";
 
 export const BEGINNER_STEPS: readonly WizardStepId[] = [
+  "how-it-works",
+  "quiz",
   "connect",
   "drainer",
   "chaingpt",

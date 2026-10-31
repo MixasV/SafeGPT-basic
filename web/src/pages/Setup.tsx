@@ -5,6 +5,8 @@ import { useAccount, useChainId, usePublicClient, useWalletClient } from "wagmi"
 
 import { StepApproveProtection } from "../components/onboarding/StepApproveProtection";
 import { StepConnectWallet } from "../components/onboarding/StepConnectWallet";
+import { StepHowItWorks } from "../components/onboarding/StepHowItWorks";
+import { StepQuiz } from "../components/onboarding/StepQuiz";
 import { ChainGPTSetup } from "../components/onboarding/ChainGPTSetup";
 import { StepDeployProtection } from "../components/onboarding/StepDeployProtection";
 import { StepDrainerCheck } from "../components/onboarding/StepDrainerCheck";
@@ -24,6 +26,8 @@ import { BEGINNER_STEPS, PRO_STEPS, useOnboardingStore, type WizardStepId } from
 import { trackEvent } from "../utils/analytics";
 
 const STEP_META: Record<WizardStepId, { title: string; description: string }> = {
+  "how-it-works": { title: "How it works", description: "Overview" },
+  quiz: { title: "Understanding check", description: "Quick quiz" },
   connect: { title: "Connect wallet", description: "Pick the wallet to protect" },
   drainer: { title: "Safety check", description: "Detect an active sweeper" },
   chaingpt: { title: "ChainGPT AI", description: "Optional AI setup" },
@@ -212,6 +216,12 @@ export function Setup() {
 
   const renderStep = () => {
     switch (step) {
+      case "how-it-works":
+        return <StepHowItWorks onContinue={() => goTo(activeIndex + 1)} />;
+
+      case "quiz":
+        return <StepQuiz onContinue={() => goTo(activeIndex + 1)} />;
+
       case "connect":
         return <StepConnectWallet connected={isConnected || DEMO_MODE} onContinue={() => goTo(activeIndex + 1)} />;
 
