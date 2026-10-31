@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSignMessage } from "wagmi";
+import { usePublicClient, useSignMessage } from "wagmi";
 import { isAddress, type Address } from "viem";
 
 import { DEMO_MODE } from "../../config/demo";
@@ -69,21 +69,45 @@ export function StepSafeAddress({ onContinue, onBack, protectedWallet, safeWalle
   const [useDemoSafe, setUseDemoSafe] = useState(DEMO_MODE);
   const [linkState, setLinkState] = useState<LinkState>(linked ? "linked" : "idle");
   const [linkError, setLinkError] = useState("");
-  const [linkedAddress, setLinkedAddress] = useState(linked ? stored : "");
+  const [safeIsContract, setSafeIsContract] = useState<boolean | null>(null);
+  const [safeBalance, setSafeBalance] = useState<string>("");
 
   // Demo Mode pre-fills the field so the wizard can be recorded without typing.
   useEffect(() => {
     if (useDemoSafe && stored === "") setSafeAddress(DEMO_ADDRESSES.safe);
   }, [setSafeAddress, stored, useDemoSafe]);
 
-  const safeWallet = DEMO_MODE ? DEMO_ADDRESSES.safe : stored;
-
+  const [linkedAddress, setLinkedAddress] = useState(linked ? stored : "");
+  const publicClient = usePublicClient();
   const { signMessageAsync } = useSignMessage();
+
+  useEffect(() => {
+    if (!publicClient || !isAddress(stored)) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const code = await publicClient.getCode({ address: stored as Address });
+        const bal = await publicClient.getBalance({ address: stored as Address });
+        if (cancelled) return;
+        setSafeIsContract(code !== "0x" && code !== undefined);
+        setSafeBalance((Number(bal) / 1e18).toFixed(4));
+      } catch {
+        if (cancelled) return;
+        setSafeIsContract(null);
+        setSafeBalance("");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [publicClient, stored]);
 
   const validation = useMemo(
     () => validateSafeAddress(stored, protectedWallet),
     [stored, protectedWallet],
   );
+
+  const safeWallet = DEMO_MODE ? DEMO_ADDRESSES.safe : stored;
 
   const link = useCallback(async () => {
     setLinkError("");
@@ -162,6 +186,17 @@ const continueDisabled = !validation.ok || (isPro && !linkedCurrent);
 
       {stored !== "" && !validation.ok && <p className="text-sm text-accent-red">{validation.reason}</p>}
       {validation.ok && <p className="text-sm text-accent-green">✓ Valid address</p>}
+      {validation.ok && safeIsContract !== null && (
+        <p className="text-sm text-text-secondary">
+          {safeIsContract ? "⚠️ This appears to be a smart contract, not a regular wallet." : "✅ Valid EOA address"} — Balance: {safeBalance} ETH
+        </p>
+      )}
+      {chainId === 1 && (
+        <p className="text-xs text-text-secondary">AI Note: Ethereum Mainnet — high security, high gas fees.</p>
+      )}
+      {chainId === 11155111 && (
+        <p className="text-xs text-text-secondary">AI Note: Sepolia testnet — use for testing only.</p>
+      )}
 
       {/* The signature is required in Pro mode and available in Beginner mode. */}
       <div className="space-y-3 rounded-lg border border-border bg-bg-tertiary p-4">
