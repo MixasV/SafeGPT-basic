@@ -139,6 +139,12 @@ export function Setup() {
     }
   }, [account, publicClient, setNativeBalance]);
 
+  useEffect(() => {
+    if (step === "assets") {
+      void refreshNativeBalance();
+    }
+  }, [step, refreshNativeBalance]);
+
   const goTo = useCallback(
     (index: number) => {
       // Indexes span the Beginner list plus, in Pro mode, the configuration
