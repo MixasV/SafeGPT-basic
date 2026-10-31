@@ -154,6 +154,12 @@ const continueDisabled = !validation.ok || (isPro && !linkedCurrent);
           <PrimaryButton onClick={onContinue} disabled={continueDisabled}>
             Continue
           </PrimaryButton>
+          {isPro && !linkedCurrent && validation.ok && (
+            <p className="text-xs text-accent-yellow">Pro mode requires linking the safe address before continuing.</p>
+          )}
+          {!validation.ok && stored !== "" && (
+            <p className="text-xs text-accent-red">{validation.reason}</p>
+          )}
         </>
       }
     >
