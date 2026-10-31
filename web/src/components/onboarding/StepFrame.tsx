@@ -54,7 +54,7 @@ export function PrimaryButton({
       onClick={onClick}
       data-testid={testId}
       disabled={disabled}
-      className={`rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      className={`rounded-lg border-2 border-accent bg-bg-primary px-4 py-2 text-sm font-semibold text-text-primary transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
     >
       {children}
     </button>

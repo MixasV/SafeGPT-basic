@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import rescueVaultSource from "../../../contracts/src/RescueVault.sol?raw";
+import { PrimaryButton } from "../components/onboarding/StepFrame";
 import { chaingpt } from "../services/chaingpt/client";
 import { MarkdownRenderer } from "../components/dashboard/MarkdownRenderer";
 
@@ -53,13 +54,9 @@ export function ContractAuditor() {
     <div className="mx-auto w-full max-w-4xl px-4 py-8 space-y-4">
       <h1 className="text-xl font-semibold text-text-primary">Contract Auditor</h1>
       <div className="rounded-xl border border-border bg-surface p-3">
-        <button
-          onClick={auditVault}
-          disabled={auditVaultLoading}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
+        <PrimaryButton onClick={auditVault} disabled={auditVaultLoading}>
           {auditVaultLoading ? "Auditing..." : "🔍 Audit SafeGPT RescueVault Contract"}
-        </button>
+        </PrimaryButton>
       </div>
       <div className="rounded-xl border border-border bg-surface p-3 space-y-2">
         <p className="text-xs text-text-secondary">Fetch verified source by address (Sourcify)</p>
@@ -78,13 +75,9 @@ export function ContractAuditor() {
             <option value={1}>Mainnet</option>
             <option value={11155111}>Sepolia</option>
           </select>
-          <button
-            onClick={fetchSource}
-            disabled={fetchLoading}
-            className="rounded-lg bg-primary px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
-          >
+          <PrimaryButton onClick={fetchSource} disabled={fetchLoading}>
             {fetchLoading ? "Fetching..." : "Fetch"}
-          </button>
+          </PrimaryButton>
         </div>
       </div>
       <textarea
@@ -94,13 +87,9 @@ export function ContractAuditor() {
         className="w-full rounded-xl border border-border bg-surface p-3 font-mono text-xs text-text-primary"
         placeholder="Paste Solidity source code here..."
       />
-      <button
-        onClick={run}
-        disabled={loading || source.trim() === ""}
-        className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-      >
+      <PrimaryButton onClick={run} disabled={loading || source.trim() === ""}>
         {loading ? "Auditing..." : "Audit contract"}
-      </button>
+      </PrimaryButton>
       {!chaingpt.isAvailable() && (
         <p className="text-xs text-text-secondary">
           Add VITE_CHAINGPT_API_KEY to .env for real AI audit. Simulated output otherwise.

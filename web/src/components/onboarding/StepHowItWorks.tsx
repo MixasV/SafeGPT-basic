@@ -1,4 +1,6 @@
-﻿export function StepHowItWorks({ onContinue }: { onContinue: () => void }) {
+﻿import { PrimaryButton } from "./StepFrame";
+
+export function StepHowItWorks({ onContinue }: { onContinue: () => void }) {
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-semibold text-text-primary">How SafeGPT Protection Works</h2>
@@ -62,9 +64,7 @@
         </p>
       </section>
 
-      <button onClick={onContinue} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white">
-        I understand, continue →
-      </button>
+      <PrimaryButton onClick={onContinue}>I understand, continue →</PrimaryButton>
     </div>
   );
 }

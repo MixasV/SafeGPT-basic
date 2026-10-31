@@ -5,8 +5,9 @@ import { isAddress, type Address } from "viem";
 
 import { chaingpt } from "../../services/chaingpt/client";
 import { MarkdownRenderer } from "../dashboard/MarkdownRenderer";
-import { ProtectionScore, calculateProtectionScore } from "./ProtectionScore";
 import { useOnboardingStore } from "../../state/onboarding";
+import { ProtectionScore, calculateProtectionScore } from "./ProtectionScore";
+import { PrimaryButton } from "./StepFrame";
 import { buildPreDeployReviewPrompt } from "../../features/onboarding/buildPreDeployReviewPrompt";
 
 export function PreDeployReview({ onContinue }: { onContinue?: () => void }) {
@@ -38,13 +39,13 @@ export function PreDeployReview({ onContinue }: { onContinue?: () => void }) {
 
   const score = calculateProtectionScore({
     hasAI: chaingpt.isAvailable(),
-    tokensApproved: assets.filter((a) => a.selected).length,
-    hasWETH: assets.some((a) => a.symbol === "WETH" && a.selected),
+    tokensApproved: assets.filter((a: any) => a.selected).length,
+    hasWETH: assets.some((a: any) => a.symbol === "WETH" && a.selected),
     executorFunded: false,
     telegramConfigured: false,
     contractAudited: auditResult !== null,
-    preApprovedZeroBalance: assets.filter((a) => a.selected && a.balance === "0").length,
-    customTokensVerified: assets.some((a) => !a.verified && a.selected),
+    preApprovedZeroBalance: assets.filter((a: any) => a.selected && a.balance === "0").length,
+    customTokensVerified: assets.some((a: any) => !a.verified && a.selected),
   });
 
   async function runReview() {
@@ -67,13 +68,9 @@ export function PreDeployReview({ onContinue }: { onContinue?: () => void }) {
     <div className="space-y-4">
       <ProtectionScore score={score} />
       <p className="text-xs text-text-secondary">Safe balance: {safeBalance} ETH</p>
-      <button
-        onClick={runReview}
-        disabled={loading}
-        className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-      >
+      <PrimaryButton onClick={runReview} disabled={loading}>
         {loading ? "🤖 Analyzing configuration..." : "Проверить текущую конфигурацию контракта"}
-      </button>
+      </PrimaryButton>
       {loading && (
         <div className="flex items-center gap-2 text-sm text-text-secondary">
           <span className="animate-spin">⏳</span> AI is analyzing your configuration...
@@ -91,25 +88,18 @@ export function PreDeployReview({ onContinue }: { onContinue?: () => void }) {
       )}
       <div className="space-y-2">
         <p className="text-sm font-medium text-text-primary">── Contract Audit ──</p>
-        <button
-          onClick={runAudit}
-          disabled={auditLoading}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
+        <PrimaryButton onClick={runAudit} disabled={auditLoading}>
           {auditLoading ? "Auditing..." : "🔍 Audit RescueVault contract"}
-        </button>
+        </PrimaryButton>
         {auditResult && (
           <div className="rounded-xl border border-border bg-surface p-4 text-sm text-text-primary">
             <MarkdownRenderer markdown={auditResult} />
           </div>
         )}
       </div>
-      <button
-        onClick={() => onContinue?.()}
-        className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white"
-      >
+      <PrimaryButton onClick={() => onContinue?.()}>
         {result ? "Deploy Vault ✅" : "Deploy Vault"}
-      </button>
+      </PrimaryButton>
     </div>
   );
 }

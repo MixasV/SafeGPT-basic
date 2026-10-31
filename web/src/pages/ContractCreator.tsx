@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { PrimaryButton } from "../components/onboarding/StepFrame";
 import { chaingpt } from "../services/chaingpt/client";
 
 export function ContractCreator() {
@@ -27,13 +28,9 @@ export function ContractCreator() {
         className="w-full rounded-xl border border-border bg-surface p-3 text-sm text-text-primary"
         placeholder="Describe the contract you want to generate..."
       />
-      <button
-        onClick={run}
-        disabled={loading || description.trim() === ""}
-        className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-      >
+      <PrimaryButton onClick={run} disabled={loading || description.trim() === ""}>
         {loading ? "Generating..." : "Generate contract"}
-      </button>
+      </PrimaryButton>
       {!chaingpt.isAvailable() && (
         <p className="text-xs text-text-secondary">
           Add VITE_CHAINGPT_API_KEY to .env for real generation. Simulated output otherwise.

@@ -1,4 +1,5 @@
 ﻿import { useState } from "react";
+import { PrimaryButton, SecondaryButton } from "./StepFrame";
 
 import { chaingpt } from "../../services/chaingpt/client";
 
@@ -68,12 +69,8 @@ export function ChainGPTSetup({ onContinue }: { onContinue?: () => void }) {
         placeholder="API key"
       />
       <div className="flex gap-2">
-        <button onClick={save} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white">
-          Continue with AI
-        </button>
-        <button onClick={skip} className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-primary">
-          Continue without AI
-        </button>
+        <PrimaryButton onClick={save}>Continue with AI</PrimaryButton>
+        <SecondaryButton onClick={skip}>Continue without AI</SecondaryButton>
       </div>
       {status && <p className="text-xs text-text-secondary">{status}</p>}
       {!chaingpt.isAvailable() && (

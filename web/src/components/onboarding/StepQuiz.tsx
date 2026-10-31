@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PrimaryButton } from "./StepFrame";
 
 interface Option {
   text: string;
@@ -130,13 +131,12 @@ export function StepQuiz({ onContinue }: { onContinue: () => void }) {
       </div>
 
       {!allDone && (
-        <button
+        <PrimaryButton
           onClick={handleNext}
           disabled={selected === null || !q.options[selected]?.correct}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
           Next
-        </button>
+        </PrimaryButton>
       )}
 
       {allDone && (
@@ -150,7 +150,7 @@ export function StepQuiz({ onContinue }: { onContinue: () => void }) {
             />
             I understand that SafeGPT Rescue Vault is a "last resort" tool, not a guarantee. Protection depends on the bot running continuously, sufficient executor ETH balance, prior token approvals, and public mempool visibility. I accept full responsibility for my funds and understand the limitations described above.
           </label>
-          <button
+          <PrimaryButton
             onClick={() => {
               localStorage.setItem("safegpt_quiz_completed", JSON.stringify({
                 completedAt: new Date().toISOString(),
@@ -160,10 +160,9 @@ export function StepQuiz({ onContinue }: { onContinue: () => void }) {
               onContinue();
             }}
             disabled={!disclaimer}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
             Continue
-          </button>
+          </PrimaryButton>
         </div>
       )}
     </div>
