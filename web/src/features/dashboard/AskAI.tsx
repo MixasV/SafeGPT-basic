@@ -1,7 +1,9 @@
-﻿import { useState } from "react";
+﻿import { useEffect, useState } from "react";
 
 import { chaingpt } from "../../services/chaingpt/client";
 import { MarkdownRenderer } from "../../components/dashboard/MarkdownRenderer";
+
+const STORAGE_KEY = "safegpt_askai_history";
 
 const EXAMPLE_QUESTIONS = [
   "Is my USDC fully protected?",
@@ -14,18 +16,30 @@ const EXAMPLE_QUESTIONS = [
 ];
 
 export function AskAI() {
-  const [messages, setMessages] = useState<{ role: "user" | "assistant"; text: string }[]>([]);
+  const [messages, setMessages] = useState<{ role: "user" | "assistant"; text: string }[]>(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+  }, [messages]);
 
   async function handleSend() {
     if (!input.trim() || !chaingpt.isAvailable()) return;
     const userMsg = input.trim();
-    setMessages((prev) => [...prev, { role: "user", text: userMsg }]);
+    const newMessages = [...messages, { role: "user" as const, text: userMsg }];
+    setMessages(newMessages);
     setInput("");
     setLoading(true);
     try {
-      const response = await chaingpt.ask(userMsg);
+      const response = await chaingpt.ask(userMsg, newMessages);
       setMessages((prev) => [...prev, { role: "assistant", text: response.data.markdown }]);
     } catch (err) {
       setMessages((prev) => [...prev, { role: "assistant", text: `Error: ${err instanceof Error ? err.message : "Failed"}` }]);
@@ -34,19 +48,29 @@ export function AskAI() {
     }
   }
 
+  function clearHistory() {
+    setMessages([]);
+    localStorage.removeItem(STORAGE_KEY);
+  }
+
   return (
-    <div className="rounded-2xl border border-border bg-surface p-4 space-y-3">
-      <h3 className="text-sm font-semibold text-text-primary">💬 AI Security Assistant</h3>
+    <div className="rounded-2xl border border-border bg-surface p-4 space-y-3 h-full flex flex-col">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-text-primary">💬 AI Security Assistant</h3>
+        <button onClick={clearHistory} className="text-xs text-text-secondary hover:text-text-primary">
+          Clear
+        </button>
+      </div>
       <p className="text-xs text-text-secondary">Powered by ChainGPT AI</p>
       {!chaingpt.isAvailable() && (
         <p className="text-xs text-text-secondary">
-          Requires ChainGPT API key. Add in Settings → ChainGPT AI Integration. Get yours at app.chaingpt.org/apidashboard
+          Requires ChainGPT API key. Add in Settings → ChainGPT AI Integration.
         </p>
       )}
-      <div className="max-h-64 space-y-2 overflow-y-auto">
-        {messages.slice(-10).map((m, i) => (
+      <div className="flex-1 max-h-96 space-y-2 overflow-y-auto">
+        {messages.slice(-20).map((m, i) => (
           <div key={i} className={`text-sm ${m.role === "user" ? "text-text-primary" : "text-text-secondary"}`}>
-            {m.role === "user" ? "You: " : "🔧¤–: "}
+            {m.role === "user" ? "You: " : "🤖: "}
             {m.role === "assistant" ? <MarkdownRenderer markdown={m.text} /> : m.text}
           </div>
         ))}
@@ -88,4 +112,3 @@ export function AskAI() {
     </div>
   );
 }
-

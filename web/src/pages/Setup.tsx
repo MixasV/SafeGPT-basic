@@ -441,15 +441,13 @@ export function Setup() {
         </div>
       )}
 
-      <WizardShell steps={steps} activeIndex={activeIndex} onNavigate={goTo}>
-        {renderStep()}
-      </WizardShell>
+      <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+        <div>
+          <WizardShell steps={steps} activeIndex={activeIndex} onNavigate={goTo}>
+            {renderStep()}
+          </WizardShell>
 
-      <div className="mt-6">
-        <AskAI />
-      </div>
-
-      <div className="mt-8 flex justify-end">
+          <div className="mt-8 flex justify-end">
         <button
           type="button"
           onClick={() => {
@@ -467,6 +465,11 @@ export function Setup() {
         >
           Restart onboarding
         </button>
+      </div>
+        </div>
+        <aside className="hidden lg:block sticky top-24 self-start">
+          <AskAI />
+        </aside>
       </div>
     </div>
   );

@@ -268,11 +268,14 @@ export class ChainGPTClient {
       (markdown) => ({ markdown }),
     );
   }
-  async ask(question: string): Promise<ChainGPTResult<ChatResult>> {
+  async ask(question: string, history: { role: string; text: string }[] = []): Promise<ChainGPTResult<ChatResult>> {
+    const context = history.map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.text}`).join("\n");
+    const fullQuestion =
+      `${ASSISTANT_SYSTEM_PROMPT}\n\nConversation so far:\n${context}\n\nUser question: ${question}`;
     const fallback = mockChat(question);
     return this.request(
       "general_assistant",
-      `${ASSISTANT_SYSTEM_PROMPT}\n\nUser question: ${question}`,
+      fullQuestion,
       fallback,
       (markdown) => ({ markdown }),
     );
