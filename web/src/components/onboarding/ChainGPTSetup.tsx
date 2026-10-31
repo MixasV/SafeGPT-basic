@@ -47,7 +47,11 @@ export function ChainGPTSetup({ onContinue }: { onContinue?: () => void }) {
       </div>
 
       <p className="text-xs text-text-secondary">
-        How to get your free API key: 1. Go to app.chaingpt.org 2. Connect wallet or create account 3. API Dashboard → Create API Key 4. Copy key and paste below
+        How to get your free API key: 1. Go to{" "}
+        <a href="https://app.chaingpt.org" target="_blank" rel="noreferrer" className="text-accent underline">
+          app.chaingpt.org
+        </a>{" "}
+        2. Connect wallet or create account 3. API Dashboard → Create API Key 4. Copy key and paste below
       </p>
       <p className="text-xs text-text-secondary">
         Cost: ~$0.005 per AI check (~$0.03-0.05 total for setup). Powered by ChainGPT AI — https://chaingpt.org

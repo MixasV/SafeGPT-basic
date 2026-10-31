@@ -23,7 +23,10 @@ export function Settings() {
       <section className="rounded-2xl border border-border bg-surface p-4 space-y-3">
         <h2 className="text-sm font-semibold text-text-primary">ChainGPT AI Integration</h2>
         <p className="text-xs text-text-secondary">
-          API Key: stored in browser localStorage. Get yours at https://app.chaingpt.org/apidashboard
+          API Key: stored in browser localStorage. Get yours at{" "}
+          <a href="https://app.chaingpt.org/apidashboard" target="_blank" rel="noreferrer" className="text-accent underline">
+            app.chaingpt.org/apidashboard
+          </a>
         </p>
         <input
           type="password"

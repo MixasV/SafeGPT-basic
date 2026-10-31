@@ -54,7 +54,11 @@ export function CoreFooter() {
 
         {chaingpt.isAvailable() && (
           <p className="mt-2 text-xs text-text-secondary">
-            Powered by ChainGPT AI — https://chaingpt.org
+            Powered by{" "}
+            <a href="https://chaingpt.org" target="_blank" rel="noreferrer" className="text-accent underline">
+              ChainGPT AI
+            </a>{" "}
+            — https://chaingpt.org
           </p>
         )}
       </div>
