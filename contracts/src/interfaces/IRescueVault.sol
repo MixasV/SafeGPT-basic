@@ -33,14 +33,17 @@ interface IRescueVault {
     /// @notice Emitted when a token transfer failed; the remaining tokens still proceed.
     event RescueFailed(address indexed token, uint256 amount);
 
-    /// @notice Emitted when the owner schedules a change of the safe address.
-    event SafeChangeRequested(address indexed newSafeAddress, uint256 requestedAt);
+    /// @notice Emitted when an ETH withdrawal is requested from the vault.
+    event WithdrawETHRequested(address indexed to, uint256 amount, uint256 executeAfter);
 
-    /// @notice Emitted when a pending safe address change is confirmed after the timelock.
-    event SafeChangeConfirmed(address indexed newSafeAddress);
+    /// @notice Emitted when a pending ETH withdrawal is executed.
+    event WithdrawETHExecuted(address indexed to, uint256 amount);
 
-    /// @notice Emitted when the owner cancels a pending safe address change.
-    event SafeChangeCancelled();
+    /// @notice Emitted when a pending ETH withdrawal is cancelled.
+    event WithdrawETHCancelled();
+
+    /// @notice Emitted when ERC-20 tokens stuck on the vault are withdrawn.
+    event StuckTokensWithdrawn(address indexed token, address indexed to, uint256 amount);
 
     /// @notice Emitted when the owner schedules a change of the quarantine address.
     event QuarantineChangeRequested(address indexed newQuarantineAddress, uint256 requestedAt);
@@ -94,11 +97,11 @@ interface IRescueVault {
     /// @notice The fee charged by the service, in basis points. Immutable after deployment.
     function feeBps() external view returns (uint16);
 
-    /// @notice The safe address awaiting confirmation, or the zero address.
-    function pendingSafeAddress() external view returns (address);
+    /// @notice Delay before a pending ETH withdrawal can be executed (0 = instant).
+    function withdrawDelay() external view returns (uint256);
 
-    /// @notice The timestamp at which {pendingSafeAddress} was requested.
-    function safeChangeRequestTime() external view returns (uint256);
+    /// @notice Timestamp of a pending ETH withdrawal request, or 0.
+    function withdrawRequestTime() external view returns (uint256);
 
     /// @notice The quarantine address awaiting confirmation, or the zero address.
     function pendingQuarantineAddress() external view returns (address);
@@ -163,14 +166,17 @@ interface IRescueVault {
      */
     function rescue(address[] calldata tokens, bool[] calldata chargeFee) external;
 
-    /// @notice Schedules a new safe address. Applies after {SAFE_CHANGE_DELAY} + {confirmSafeChange}.
-    function requestSafeChange(address newSafe) external;
+    /// @notice Withdraw ETH forced into the vault. Callable only by the safe address.
+    function requestWithdrawETH() external;
 
-    /// @notice Applies the pending safe address once the timelock has elapsed.
-    function confirmSafeChange() external;
+    /// @notice Execute a pending ETH withdrawal after the delay has elapsed.
+    function executeWithdrawETH() external;
 
-    /// @notice Drops the pending safe address change.
-    function cancelSafeChange() external;
+    /// @notice Cancel a pending ETH withdrawal request.
+    function cancelWithdrawETH() external;
+
+    /// @notice Withdraw ERC-20 tokens sent directly to the vault. Callable only by the safe address.
+    function withdrawStuckTokens(address token) external;
 
     /// @notice Schedules a new quarantine address for unverified (watch-set) tokens.
     function requestQuarantineChange(address newQuarantine) external;

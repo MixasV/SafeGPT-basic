@@ -85,11 +85,11 @@ export function useVaultDeploy(
     if (!factoryAddress) return null;
 
     const factory = factoryAddress as Address;
-    const initCode = encodeDeployData({
-      abi: rescueVaultAbi,
-      bytecode: rescueVaultBytecode,
-      args: [params.owner, params.safeAddress, params.executor, params.feeReceiver, params.feeBps],
-    });
+       const initCode = encodeDeployData({
+         abi: rescueVaultAbi,
+         bytecode: rescueVaultBytecode,
+         args: [params.owner, params.safeAddress, params.executor, params.feeReceiver, params.feeBps, 0],
+       });
 
     // getCreate2Address hashes the init code internally.
     return getCreate2Address({ from: factory, salt, bytecode: initCode }) as Address;
@@ -151,11 +151,11 @@ export function useVaultDeploy(
       }
 
       setPhase("creating-vault");
-      const hash = await walletClient.writeContract({
-        address: factory,
-        abi: rescueVaultFactoryAbi,
-        functionName: "createVault",
-        args: [account, params.safeAddress, params.executor, params.feeReceiver, params.feeBps, salt],
+         const hash = await walletClient.writeContract({
+           address: factory,
+           abi: rescueVaultFactoryAbi,
+           functionName: "createVault",
+           args: [account, params.safeAddress, params.executor, params.feeReceiver, params.feeBps, 0, salt],
         account,
         chain: walletClient.chain,
       });
@@ -184,7 +184,7 @@ const created = (logs[0] as { args?: { vault?: Address } } | undefined)?.args?.v
           bytecode: encodeDeployData({
             abi: rescueVaultAbi,
             bytecode: rescueVaultBytecode,
-            args: [account, params.safeAddress, params.executor, params.feeReceiver, params.feeBps],
+            args: [account, params.safeAddress, params.executor, params.feeReceiver, params.feeBps, 0],
           }),
         }) as Address);
 

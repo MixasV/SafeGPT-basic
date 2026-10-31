@@ -7,6 +7,7 @@ import {IRescueVault} from "./interfaces/IRescueVault.sol";
 ///      contract folder stays dependency-free (no OpenZeppelin requirement).
 interface IERC20 {
     function balanceOf(address account) external view returns (uint256);
+    function transfer(address to, uint256 amount) external returns (bool);
     function transferFrom(address from, address to, uint256 amount) external returns (bool);
 }
 
@@ -80,7 +81,7 @@ contract RescueVault is IRescueVault {
     address public owner;
 
     /// @inheritdoc IRescueVault
-    address public safeAddress;
+    address public immutable safeAddress;
 
     /// @inheritdoc IRescueVault
     address public quarantineAddress;
@@ -94,11 +95,11 @@ contract RescueVault is IRescueVault {
     /// @inheritdoc IRescueVault
     uint16 public feeBps;
 
-    /// @inheritdoc IRescueVault
-    address public pendingSafeAddress;
+    /// @notice Delay before a pending ETH withdrawal can be executed (0 = instant).
+    uint256 public immutable withdrawDelay;
 
-    /// @inheritdoc IRescueVault
-    uint256 public safeChangeRequestTime;
+    /// @notice Timestamp of a pending ETH withdrawal request, or 0.
+    uint256 public withdrawRequestTime;
 
     /// @inheritdoc IRescueVault
     address public pendingQuarantineAddress;
@@ -158,20 +159,25 @@ contract RescueVault is IRescueVault {
      * @param executor_ The bot address allowed to trigger a rescue.
      * @param feeReceiver_ Where the service fee goes.
      * @param feeBps_ The service fee in basis points. Must not exceed {MAX_FEE_BPS}.
+     * @param withdrawDelay_ Delay before a pending ETH withdrawal can be executed (0 = instant).
      */
-    constructor(address owner_, address safeAddress_, address executor_, address feeReceiver_, uint16 feeBps_) {
+    constructor(address owner_, address safeAddress_, address executor_, address feeReceiver_, uint16 feeBps_, uint256 withdrawDelay_) {
         require(owner_ != address(0), "RescueVault: owner is zero address");
         require(safeAddress_ != address(0), "RescueVault: safeAddress is zero address");
         require(safeAddress_ != owner_, "RescueVault: safeAddress must differ from owner");
         require(executor_ != address(0), "RescueVault: executor is zero address");
+        require(safeAddress_ != executor_, "RescueVault: safeAddress must differ from executor");
+        require(executor_ != owner_, "RescueVault: executor must differ from owner");
         require(feeReceiver_ != address(0), "RescueVault: feeReceiver is zero address");
         require(feeBps_ <= MAX_FEE_BPS, "RescueVault: feeBps exceeds MAX_FEE_BPS");
+        require(withdrawDelay_ <= 7 days, "RescueVault: withdraw delay exceeds 7 days");
 
         owner = owner_;
         safeAddress = safeAddress_;
         executor = executor_;
         feeReceiver = feeReceiver_;
         feeBps = feeBps_;
+        withdrawDelay = withdrawDelay_;
         reentrancyStatus = REENTRANCY_NOT_ENTERED;
     }
 
@@ -192,44 +198,7 @@ contract RescueVault is IRescueVault {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            SAFE ADDRESS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @inheritdoc IRescueVault
-    function requestSafeChange(address newSafe) external onlyOwner {
-        require(newSafe != address(0), "RescueVault: newSafe is zero address");
-        require(newSafe != owner, "RescueVault: newSafe must differ from owner");
-
-        pendingSafeAddress = newSafe;
-        safeChangeRequestTime = block.timestamp;
-
-        emit SafeChangeRequested(newSafe, block.timestamp);
-    }
-
-    /// @inheritdoc IRescueVault
-    function confirmSafeChange() external onlyOwner {
-        require(pendingSafeAddress != address(0), "RescueVault: no pending safe change");
-        require(
-            block.timestamp >= safeChangeRequestTime + SAFE_CHANGE_DELAY,
-            "RescueVault: safe change timelock not elapsed"
-        );
-
-        safeAddress = pendingSafeAddress;
-        pendingSafeAddress = address(0);
-
-        emit SafeChangeConfirmed(safeAddress);
-    }
-
-    /// @inheritdoc IRescueVault
-    function cancelSafeChange() external onlyOwner {
-        pendingSafeAddress = address(0);
-        safeChangeRequestTime = 0;
-
-        emit SafeChangeCancelled();
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                         QUARANTINE ADDRESS
+                          QUARANTINE ADDRESS
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IRescueVault
@@ -302,7 +271,65 @@ contract RescueVault is IRescueVault {
     }
 
     /*//////////////////////////////////////////////////////////////
-                              WHITELIST
+                               WITHDRAWAL
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Withdraw ETH that was forced into the vault (e.g. via selfdestruct).
+    ///         Callable only by the safe address. No receive()/fallback() exists,
+    ///         so direct ETH transfers revert — this is a safety net only.
+    function requestWithdrawETH() external nonReentrant {
+        require(msg.sender == safeAddress, "RescueVault: not safe");
+        uint256 balance = address(this).balance;
+        require(balance > 0, "RescueVault: no ETH");
+
+        if (withdrawDelay == 0) {
+            (bool success, ) = safeAddress.call{value: balance}("");
+            require(success, "RescueVault: ETH transfer failed");
+            emit WithdrawETHExecuted(safeAddress, balance);
+        } else {
+            withdrawRequestTime = block.timestamp;
+            emit WithdrawETHRequested(safeAddress, balance, block.timestamp + withdrawDelay);
+        }
+    }
+
+    /// @notice Execute a pending ETH withdrawal after the delay has elapsed.
+    function executeWithdrawETH() external nonReentrant {
+        require(msg.sender == safeAddress, "RescueVault: not safe");
+        require(withdrawDelay > 0, "RescueVault: no delay configured");
+        require(withdrawRequestTime > 0, "RescueVault: no pending request");
+        require(
+            block.timestamp >= withdrawRequestTime + withdrawDelay,
+            "RescueVault: too early"
+        );
+
+        withdrawRequestTime = 0;
+        uint256 balance = address(this).balance;
+        require(balance > 0, "RescueVault: no ETH");
+        (bool success, ) = safeAddress.call{value: balance}("");
+        require(success, "RescueVault: ETH transfer failed");
+        emit WithdrawETHExecuted(safeAddress, balance);
+    }
+
+    /// @notice Cancel a pending ETH withdrawal request.
+    function cancelWithdrawETH() external {
+        require(msg.sender == safeAddress, "RescueVault: not safe");
+        require(withdrawRequestTime > 0, "RescueVault: no pending request");
+        withdrawRequestTime = 0;
+        emit WithdrawETHCancelled();
+    }
+
+    /// @notice Withdraw ERC-20 tokens that were sent directly to the vault (not via rescue).
+    ///         Callable only by the safe address. Withdraws the vault's own balance.
+    function withdrawStuckTokens(address token) external nonReentrant {
+        require(msg.sender == safeAddress, "RescueVault: not safe");
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        require(balance > 0, "RescueVault: no stuck tokens");
+        IERC20(token).transfer(safeAddress, balance);
+        emit StuckTokensWithdrawn(token, safeAddress, balance);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                               WHITELIST
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IRescueVault

@@ -26,6 +26,7 @@ contract RescueVaultFactory {
      * @param executor The bot address allowed to trigger rescues.
      * @param feeReceiver Where the SafeGPT service fee is sent.
      * @param feeBps Service fee in basis points, capped at 1000.
+     * @param withdrawDelay Delay before a pending ETH withdrawal can be executed (0 = instant).
      * @param salt CREATE2 salt. Reusing a salt with identical arguments reverts.
      * @return vault The address of the freshly deployed vault.
      */
@@ -35,9 +36,10 @@ contract RescueVaultFactory {
         address executor,
         address feeReceiver,
         uint16 feeBps,
+        uint256 withdrawDelay,
         bytes32 salt
     ) external returns (address vault) {
-        vault = address(new RescueVault{salt: salt}(owner, safeAddress, executor, feeReceiver, feeBps));
+        vault = address(new RescueVault{salt: salt}(owner, safeAddress, executor, feeReceiver, feeBps, withdrawDelay));
 
         emit VaultCreated(vault, owner, safeAddress);
     }

@@ -42,7 +42,7 @@ contract Deploy is Script {
         vm.startBroadcast(executorPrivateKey);
 
         factory = new RescueVaultFactory();
-        vault = RescueVault(factory.createVault(protectedWallet, safeAddress, executor, feeReceiver, feeBps, salt));
+        vault = RescueVault(factory.createVault(protectedWallet, safeAddress, executor, feeReceiver, feeBps, 0, salt));
 
         vm.stopBroadcast();
 
@@ -58,3 +58,4 @@ contract Deploy is Script {
         console2.log("NEXT STEP: the protected wallet must approve each protected ERC-20 to the vault.");
     }
 }
+
