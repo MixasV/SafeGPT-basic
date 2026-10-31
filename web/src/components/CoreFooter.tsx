@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 
-import { PRODUCT, DISCLAIMER } from "../config/content";
+import { chaingpt } from "../services/chaingpt/client";
+import { DISCLAIMER } from "../config/content";
 
 /**
  * Core footer.
@@ -51,10 +52,11 @@ export function CoreFooter() {
           {DISCLAIMER.footer}
         </p>
 
-        <p className="mt-2 text-xs text-text-secondary">
-          {PRODUCT} is a security tool. It does not execute trades, provide financial advice, or manage
-          investment portfolios.
-        </p>
+        {chaingpt.isAvailable() && (
+          <p className="mt-2 text-xs text-text-secondary">
+            Powered by ChainGPT AI — https://chaingpt.org
+          </p>
+        )}
       </div>
     </footer>
   );

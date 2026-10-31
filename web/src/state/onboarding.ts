@@ -122,7 +122,7 @@ interface OnboardingState {
 }
 
 const INITIAL = {
-  step: "connect" as WizardStepId,
+  step: "how-it-works" as WizardStepId,
   walletAddress: "",
   safeAddress: "",
   safeAddressLinked: false,

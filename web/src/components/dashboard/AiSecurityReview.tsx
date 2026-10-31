@@ -3,9 +3,11 @@ import { useState } from "react";
 import { chaingpt } from "../../services/chaingpt/client";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 
-type Props = { configJson: string };
+import { buildSecurityReviewPrompt } from "../../features/dashboard/buildSecurityReviewPrompt";
 
-export function AiSecurityReview({ configJson }: Props) {
+type Props = Record<string, never>;
+
+export function AiSecurityReview(_props: Props) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
@@ -13,7 +15,8 @@ export function AiSecurityReview({ configJson }: Props) {
   async function run() {
     setLoading(true);
     setWarning(null);
-    const r = await chaingpt.reviewConfiguration(configJson);
+    const prompt = buildSecurityReviewPrompt();
+    const r = await chaingpt.reviewConfiguration(prompt);
     setResult(r.data.markdown);
     setWarning(r.warning ?? null);
     setLoading(false);

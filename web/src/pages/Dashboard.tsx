@@ -1,16 +1,18 @@
 import { useState } from "react";
 import { useWriteContract } from "wagmi";
+import { DEMO_MODE } from "../config/demo";
 import { trackEvent } from "../utils/analytics";
 
 import { AlertFeed } from "../components/dashboard/AlertFeed";
+import { AiSecurityReview } from "../components/dashboard/AiSecurityReview";
 import { ProtectionStatusPanel } from "../components/dashboard/ProtectionStatus";
 import { QuickActions } from "../components/dashboard/QuickActions";
 import { RescueHistory } from "../components/dashboard/RescueHistory";
-import { AiSecurityReview } from "../components/dashboard/AiSecurityReview";
+import { ProtectionScore, calculateProtectionScore } from "../components/onboarding/ProtectionScore";
 import { TokenList } from "../components/dashboard/TokenList";
 import { WalletCard } from "../components/dashboard/WalletCard";
 import { WarningBanner } from "../components/common/WarningBanner";
-import { DEMO_MODE } from "../config/demo";
+import { chaingpt } from "../services/chaingpt/client";
 import { erc20Abi } from "../config/contracts";
 import type { TokenStatusInfo } from "../dashboard/status";
 import { useMode } from "../hooks/useMode";
@@ -99,6 +101,19 @@ async function handleReapprove(entry: TokenStatusInfo): Promise<void> {
         isLoading={vault.isLoading}
       />
 
+      <ProtectionScore
+        score={calculateProtectionScore({
+          hasAI: chaingpt.isAvailable(),
+          tokensApproved: status.tokens.length,
+          hasWETH: status.tokens.some((t) => t.token.symbol === "WETH"),
+          executorFunded: vault.executorBalance > 0n,
+          telegramConfigured: false,
+          contractAudited: false,
+          preApprovedZeroBalance: 0,
+          customTokensVerified: false,
+        })}
+      />
+
       <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
         <TokenList
           tokens={status.tokens}
@@ -132,7 +147,7 @@ async function handleReapprove(entry: TokenStatusInfo): Promise<void> {
         </div>
       </div>
 
-      <AiSecurityReview configJson={JSON.stringify({ tokens: status.tokens, vault: vault.vaultAddress, chainId: vault.chainId })} />
+      <AiSecurityReview />
 
       <div className="grid gap-5 lg:grid-cols-2">
         <AlertFeed

@@ -1,10 +1,6 @@
 import { useState } from "react";
 
-interface Props {
-  onContinue?: () => void;
-}
-
-export function ChainGPTSetup({ onContinue }: Props) {
+export function ChainGPTSetup({ onContinue }: { onContinue?: () => void }) {
   const [key, setKey] = useState("");
   const [status, setStatus] = useState("");
 
@@ -26,7 +22,13 @@ export function ChainGPTSetup({ onContinue }: Props) {
     <div className="rounded-2xl border border-border bg-surface p-4 space-y-3">
       <h3 className="text-sm font-semibold text-text-primary">ChainGPT AI (optional)</h3>
       <p className="text-xs text-text-secondary">
-        Works without AI. With a key you get config review and contract audit.
+        Works without AI. With a key you get config review, contract audit, and contract generation.
+      </p>
+      <p className="text-xs text-text-secondary">
+        Security improvement: enabling AI review adds +15% to your Protection Score and helps catch misconfigurations before deployment.
+      </p>
+      <p className="text-xs text-text-secondary">
+        Powered by ChainGPT AI — https://chaingpt.org
       </p>
       <input
         type="password"
