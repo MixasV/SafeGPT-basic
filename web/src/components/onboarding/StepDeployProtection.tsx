@@ -83,7 +83,7 @@ export function StepDeployProtection({
               disabled={busy || !safeAddress || guardianSelected}
               testId="deploy-submit"
             >
-              🔧љЂ Deploy Protection
+              Deploy Protection
             </PrimaryButton>
           )}
         </>

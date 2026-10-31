@@ -100,15 +100,17 @@ export function Setup() {
 
   // Default the executor and fee receiver to the connected wallet so the wizard
   // works out of the box; Pro mode exposes both for a self-hosted deployment.
-  const resolvedExecutor = executor === "0x0000000000000000000000000000000000000000" && account ? account : executor;
+  const resolvedExecutor = executor;
   const resolvedFeeReceiver =
-    feeReceiver === "0x0000000000000000000000000000000000000000" && account ? account : feeReceiver;
+    feeReceiver === "0x0000000000000000000000000000000000000000"
+      ? (safeAddress || account || "0x0000000000000000000000000000000000000000")
+      : feeReceiver;
 
   const deployHook = useVaultDeploy(walletClient, publicClient, {
     owner: account ?? ("0x0000000000000000000000000000000000000000" as Address),
     safeAddress: (safeAddress || "0x0000000000000000000000000000000000000000") as Address,
-    executor: resolvedExecutor,
-    feeReceiver: resolvedFeeReceiver,
+    executor: resolvedExecutor as Address,
+    feeReceiver: resolvedFeeReceiver as Address,
     feeBps,
   });
 
@@ -317,7 +319,7 @@ export function Setup() {
             vaultTxHash={deployHook.vaultTxHash}
             predictedVaultAddress={deployHook.predictedVaultAddress}
             deploy={() => void deployHook.deploy()}
-            params={{ executor: resolvedExecutor, feeReceiver: resolvedFeeReceiver, feeBps }}
+            params={{ executor: resolvedExecutor as Address, feeReceiver: resolvedFeeReceiver as Address, feeBps }}
             onParamsChange={(patch) => {
               if (patch.executor !== undefined) setExecutor(patch.executor);
               if (patch.feeReceiver !== undefined) setFeeReceiver(patch.feeReceiver);
@@ -407,6 +409,25 @@ export function Setup() {
           {mode === "pro" ? "Switch to Beginner" : "Switch to Pro mode"}
         </button>
       </div>
+
+      {resolvedExecutor === "0x0000000000000000000000000000000000000000" && (
+        <div className="mb-4 rounded-lg border border-border bg-bg-tertiary p-4">
+          <p className="text-sm font-medium text-text-primary">Executor (bot) address</p>
+          <p className="mt-1 text-xs text-text-secondary">
+            Run <code>npx safegpt-bot init</code> to create an executor wallet, then paste its address here.
+          </p>
+          <input
+            value={executor}
+            onChange={(e) => setExecutor(e.target.value as Address)}
+            placeholder="0x..."
+            className="mt-2 w-full rounded-lg border border-border bg-bg-primary px-3 py-2 font-mono text-sm text-text-primary"
+          />
+          {executor !== "0x0000000000000000000000000000000000000000" &&
+            (executor.toLowerCase() === account?.toLowerCase() || executor.toLowerCase() === safeAddress.toLowerCase()) && (
+              <p className="mt-1 text-xs text-accent-red">Executor must differ from protected wallet and safe address.</p>
+            )}
+        </div>
+      )}
 
       <WizardShell steps={steps} activeIndex={activeIndex} onNavigate={goTo}>
         {renderStep()}

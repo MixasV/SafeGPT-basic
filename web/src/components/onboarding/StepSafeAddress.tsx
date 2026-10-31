@@ -247,8 +247,7 @@ const continueDisabled = !validation.ok || (isPro && !linkedCurrent);
           <ul className="list-disc space-y-1 pl-5">
             <li>You may point the safe address at an existing Safe multisig.</li>
             <li>
-              Changing the safe address later takes effect only after a 72-hour timelock plus a confirmation
-              transaction — a stolen owner key cannot redirect a rescue instantly.
+              The safe address is immutable after deployment. Changing it requires redeploying the vault.
             </li>
           </ul>
         </div>

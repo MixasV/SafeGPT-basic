@@ -71,6 +71,9 @@ export function PreDeployReview({ onContinue }: { onContinue?: () => void }) {
       <PrimaryButton onClick={runReview} disabled={loading}>
         {loading ? "🤖 Analyzing configuration..." : "Check current contract configuration"}
       </PrimaryButton>
+      <p className="text-xs text-text-secondary">
+        AI analyzes your configuration (tokens, safe address, thresholds) and gives security recommendations.
+      </p>
       {loading && (
         <div className="flex items-center gap-2 text-sm text-text-secondary">
           <span className="animate-spin">⏳</span> AI is analyzing your configuration...
@@ -91,6 +94,9 @@ export function PreDeployReview({ onContinue }: { onContinue?: () => void }) {
         <PrimaryButton onClick={runAudit} disabled={auditLoading}>
           {auditLoading ? "Auditing..." : "🔍 Audit RescueVault contract"}
         </PrimaryButton>
+        <p className="text-xs text-text-secondary">
+          AI audits the Solidity source code of the RescueVault contract for vulnerabilities.
+        </p>
         {auditResult && (
           <div className="rounded-xl border border-border bg-surface p-4 text-sm text-text-primary">
             <MarkdownRenderer markdown={auditResult} />
