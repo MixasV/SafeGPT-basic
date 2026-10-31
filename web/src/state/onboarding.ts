@@ -12,6 +12,7 @@ export type WizardStepId =
   | "chaingpt"
   | "safe-address"
   | "assets"
+  | "pre-deploy"
   | "deploy"
   | "approve"
   | "active"
@@ -26,6 +27,7 @@ export const BEGINNER_STEPS: readonly WizardStepId[] = [
   "chaingpt",
   "safe-address",
   "assets",
+  "pre-deploy",
   "deploy",
   "approve",
   "active",

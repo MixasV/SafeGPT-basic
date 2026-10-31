@@ -12,6 +12,7 @@ import { StepAlerts, StepRules, StepWhitelist } from "../components/onboarding/S
 import { StepProtectionActive } from "../components/onboarding/StepProtectionActive";
 import { StepSafeAddress } from "../components/onboarding/StepSafeAddress";
 import { StepSelectAssets } from "../components/onboarding/StepSelectAssets";
+import { PreDeployReview } from "../components/onboarding/PreDeployReview";
 import { WizardShell } from "../components/onboarding/WizardShell";
 import { DEMO_MODE } from "../config/demo";
 import { DEFAULT_FEE_BPS, getWethAddress, wethAbi } from "../config/contracts";
@@ -28,6 +29,7 @@ const STEP_META: Record<WizardStepId, { title: string; description: string }> = 
   chaingpt: { title: "ChainGPT AI", description: "Optional AI setup" },
   "safe-address": { title: "Safe address", description: "Where funds are rescued to" },
   assets: { title: "Select assets", description: "Scan ERC-20 balances" },
+  "pre-deploy": { title: "Pre-deploy review", description: "AI config review" },
   deploy: { title: "Deploy protection", description: "Create the vault contract" },
   approve: { title: "Approve protection", description: "One approval per token" },
   active: { title: "Protection active", description: "Monitoring started" },
@@ -245,6 +247,9 @@ export function Setup() {
             onContinue={() => goTo(activeIndex + 1)}
           />
         );
+
+      case "pre-deploy":
+        return <PreDeployReview onContinue={() => goTo(activeIndex + 1)} />;
 
       case "deploy":
         return (
