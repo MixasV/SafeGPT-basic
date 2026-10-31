@@ -20,7 +20,7 @@ import { DEMO_MODE } from "../config/demo";
 import { DEFAULT_FEE_BPS, getWethAddress, wethAbi } from "../config/contracts";
 import { DEMO_ADDRESSES } from "../config/tokens";
 import { useApprovalFlow } from "../hooks/useApprovalFlow";
-import { useMode } from "../hooks/useMode";
+import { useMode, useModeStore } from "../hooks/useMode";
 import { useVaultDeploy } from "../hooks/useVaultDeploy";
 import { BEGINNER_STEPS, PRO_STEPS, useOnboardingStore, type WizardStepId } from "../state/onboarding";
 import { trackEvent } from "../utils/analytics";
@@ -218,7 +218,12 @@ export function Setup() {
         await publicClient.waitForTransactionReceipt({ hash });
         await refreshNativeBalance();
       } catch (cause) {
-        setWrapError(cause instanceof Error ? cause.message : "The WETH wrap transaction failed.");
+        const msg = cause instanceof Error ? cause.message : "The WETH wrap transaction failed.";
+        if (/reject|denied|cancelled/i.test(msg)) {
+          setWrapError("Transaction cancelled by user.");
+        } else {
+          setWrapError(msg);
+        }
       } finally {
         setWrapping(false);
       }
@@ -392,6 +397,16 @@ export function Setup() {
           Testnet mode — no real assets. Use for testing only.
         </p>
       )}
+
+      <div className="mb-4 flex justify-end">
+        <button
+          type="button"
+          onClick={() => useModeStore.getState().toggleMode()}
+          className="rounded-lg border border-border px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary"
+        >
+          {mode === "pro" ? "Switch to Beginner" : "Switch to Pro mode"}
+        </button>
+      </div>
 
       <WizardShell steps={steps} activeIndex={activeIndex} onNavigate={goTo}>
         {renderStep()}

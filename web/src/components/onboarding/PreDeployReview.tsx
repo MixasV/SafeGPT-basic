@@ -69,7 +69,7 @@ export function PreDeployReview({ onContinue }: { onContinue?: () => void }) {
       <ProtectionScore score={score} />
       <p className="text-xs text-text-secondary">Safe balance: {safeBalance} ETH</p>
       <PrimaryButton onClick={runReview} disabled={loading}>
-        {loading ? "🤖 Analyzing configuration..." : "Проверить текущую конфигурацию контракта"}
+        {loading ? "🤖 Analyzing configuration..." : "Check current contract configuration"}
       </PrimaryButton>
       {loading && (
         <div className="flex items-center gap-2 text-sm text-text-secondary">
