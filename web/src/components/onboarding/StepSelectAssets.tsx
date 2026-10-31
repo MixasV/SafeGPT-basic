@@ -1,5 +1,5 @@
-﻿import { useState } from "react";
-import { formatUnits, isAddress, maxUint256, type Address } from "viem";
+﻿import { useEffect, useState } from "react";
+import { formatUnits, isAddress, maxUint256, parseUnits, type Address } from "viem";
 
 import { DEMO_MODE } from "../../config/demo";
 import { getWethAddress } from "../../config/contracts";
@@ -52,7 +52,15 @@ export function StepSelectAssets({
   const toggleAsset = useOnboardingStore((state) => state.toggleAsset);
   const setAssetVerified = useOnboardingStore((state) => state.setAssetVerified);
   const setAssetThreshold = useOnboardingStore((state) => state.setAssetThreshold);
+  const [wrapAmount, setWrapAmount] = useState("");
   const addManualAsset = useOnboardingStore((state) => state.addManualAsset);
+  useEffect(() => {
+    if (nativeBalanceWei > 0n) {
+      const reserve = parseUnits("0.01", 18);
+      const amt = nativeBalanceWei > reserve ? nativeBalanceWei - reserve : nativeBalanceWei;
+      setWrapAmount(formatUnits(amt, 18));
+    }
+  }, [nativeBalanceWei]);
 
   const { scan, applyToStore, loading, source, error } = useTokenScan();
   const [manualAddress, setManualAddress] = useState("");
@@ -225,9 +233,33 @@ export function StepSelectAssets({
           {wethAddress ? ` · WETH ${wethAddress}` : " · WETH is not available on this network"}
         </p>
         {wethAddress && Number(nativeBalanceWei) > 0n && (
-          <PrimaryButton onClick={() => void onWrapEth(nativeBalanceWei)} disabled={wrapping} className="mt-3">
-            {wrapping ? "Wrapping…" : "Wrap ETH → WETH"}
-          </PrimaryButton>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              inputMode="decimal"
+              value={wrapAmount}
+              onChange={(e) => setWrapAmount(e.target.value)}
+              placeholder={`Amount (max ${formatUnits(nativeBalanceWei, 18)})`}
+              className="w-40 rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-sm text-text-primary"
+            />
+            <PrimaryButton
+              onClick={() => {
+                const amt = wrapAmount.trim() === "" ? nativeBalanceWei : parseUnits(wrapAmount, 18);
+                if (amt > nativeBalanceWei) return;
+                void onWrapEth(amt);
+              }}
+              disabled={wrapping || (wrapAmount.trim() !== "" && (() => { try { return parseUnits(wrapAmount, 18) > nativeBalanceWei; } catch { return true; } })())}
+            >
+              {wrapping ? "Wrapping…" : "Wrap ETH → WETH"}
+            </PrimaryButton>
+            <button
+              type="button"
+              onClick={() => setWrapAmount(formatUnits(nativeBalanceWei, 18))}
+              className="text-xs text-text-secondary underline"
+            >
+              Max
+            </button>
+          </div>
         )}
       </div>
 
