@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePublicClient, useSignMessage } from "wagmi";
-import { isAddress, type Address } from "viem";
+import { isAddress, recoverMessageAddress, type Address } from "viem";
 
 import { DEMO_MODE } from "../../config/demo";
 import { DEMO_ADDRESSES } from "../../config/tokens";
@@ -123,8 +123,13 @@ export function StepSafeAddress({ onContinue, onBack, protectedWallet, safeWalle
     }
 
     try {
+      const message = buildLinkMessage(safeWallet, chainId, window.location.host);
       const target = safeWalletClient ?? { signMessage: signMessageAsync };
-      await target.signMessage({ message: buildLinkMessage(safeWallet, chainId, window.location.host) });
+      const signature = await target.signMessage({ message });
+      const recovered = await recoverMessageAddress({ message, signature: signature as `0x${string}` });
+      if (recovered.toLowerCase() !== safeWallet.toLowerCase()) {
+        throw new Error("Signature does not match the safe address. Switch your wallet to the safe address first.");
+      }
       setLinked(true);
       setLinkedAddress(stored.trim());
       setLinkState("linked");
