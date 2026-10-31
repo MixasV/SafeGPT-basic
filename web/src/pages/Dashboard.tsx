@@ -6,6 +6,7 @@ import { AlertFeed } from "../components/dashboard/AlertFeed";
 import { ProtectionStatusPanel } from "../components/dashboard/ProtectionStatus";
 import { QuickActions } from "../components/dashboard/QuickActions";
 import { RescueHistory } from "../components/dashboard/RescueHistory";
+import { AiSecurityReview } from "../components/dashboard/AiSecurityReview";
 import { TokenList } from "../components/dashboard/TokenList";
 import { WalletCard } from "../components/dashboard/WalletCard";
 import { WarningBanner } from "../components/common/WarningBanner";
@@ -131,6 +132,8 @@ async function handleReapprove(entry: TokenStatusInfo): Promise<void> {
         </div>
       </div>
 
+      <AiSecurityReview configJson={JSON.stringify({ tokens: status.tokens, vault: vault.vaultAddress, chainId: vault.chainId })} />
+
       <div className="grid gap-5 lg:grid-cols-2">
         <AlertFeed
           alerts={DEMO_MODE ? MOCK_ALERTS : []}
@@ -139,7 +142,7 @@ async function handleReapprove(entry: TokenStatusInfo): Promise<void> {
           hasBotConfigured={vault.vaultAddress !== undefined}
         />
 
-<RescueHistory history={history} chainId={vault.chainId} isPro={isPro} />
+        <RescueHistory history={history} chainId={vault.chainId} isPro={isPro} />
       </div>
 
       {/* Floating assistant. Present without an API key too — the canned prompts
