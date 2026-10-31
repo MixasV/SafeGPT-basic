@@ -11,7 +11,7 @@ export function ProtectionScore({ score }: Props) {
     clamped <= 40 ? "Critical" : clamped <= 60 ? "Basic" : clamped <= 80 ? "Good" : "Strong";
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-3">
+    <div className="rounded-xl border border-border bg-surface p-3" title="Score factors: +10 vault deployed, +10 safe≠owner, +4 per token (max 20), +10 WETH, +15 AI, +10 audit, +10 executor funded, +5 Telegram, +5 pre-approve zero-balance, +5 custom verified.">
       <div className="flex items-center justify-between text-xs text-text-secondary">
         <span>Protection Score</span>
         <span>{clamped}% — {label}</span>
