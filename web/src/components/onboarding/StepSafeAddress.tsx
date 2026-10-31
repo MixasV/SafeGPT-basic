@@ -231,26 +231,28 @@ const continueDisabled = !validation.ok || (isPro && !linkedCurrent);
 
         {linkError && <p className="text-sm text-accent-red">{linkError}</p>}
 
-        <div className="flex flex-wrap gap-2">
-          {DEMO_MODE ? (
-            <PrimaryButton onClick={() => void link()} disabled={linkedCurrent || linkState === "signing"}>
-              {linkedCurrent ? "Signature captured" : "Simulate signature"}
-            </PrimaryButton>
-          ) : (
-            <PrimaryButton
-              onClick={() => void link()}
-              disabled={!validation.ok || linkedCurrent || linkState === "signing"}
-            >
-              {linkState === "signing" ? "Waiting for signature…" : "Sign with the safe wallet"}
-            </PrimaryButton>
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap gap-2">
+            {DEMO_MODE ? (
+              <PrimaryButton onClick={() => void link()} disabled={linkedCurrent || linkState === "signing"}>
+                {linkedCurrent ? "Signature captured" : "Simulate signature"}
+              </PrimaryButton>
+            ) : (
+              <PrimaryButton
+                onClick={() => void link()}
+                disabled={!validation.ok || linkedCurrent || linkState === "signing"}
+              >
+                {linkState === "signing" ? "Waiting for signature…" : "Sign with the safe wallet"}
+              </PrimaryButton>
+            )}
+          </div>
+          {isPro && !linkedCurrent && validation.ok && (
+            <p className="text-xs text-accent-yellow">Pro mode requires linking the safe address before continuing.</p>
+          )}
+          {!validation.ok && stored !== "" && (
+            <p className="text-xs text-accent-red">{validation.reason}</p>
           )}
         </div>
-        {isPro && !linkedCurrent && validation.ok && (
-          <p className="mt-2 text-xs text-accent-yellow">Pro mode requires linking the safe address before continuing.</p>
-        )}
-        {!validation.ok && stored !== "" && (
-          <p className="mt-1 text-xs text-accent-red">{validation.reason}</p>
-        )}
       </div>
 
       {isPro && (
