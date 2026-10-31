@@ -53,7 +53,7 @@ const CHAINGPT_URL = "https://api.chaingpt.org/chat/stream";
 
 const ENV = {
   proxyUrl: (import.meta.env.VITE_CHAINGPT_PROXY_URL as string | undefined)?.trim(),
-  apiKey: (import.meta.env.VITE_CHAINGPT_API_KEY as string | undefined)?.trim(),
+  apiKey: (import.meta.env.VITE_CHAINGPT_API_KEY as string | undefined)?.trim() || (typeof localStorage !== "undefined" ? localStorage.getItem("chaingpt_api_key")?.trim() : undefined),
 };
 
 export type Transport = "proxy" | "direct" | "mock";

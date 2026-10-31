@@ -5,6 +5,7 @@ import { useAccount, useChainId, usePublicClient, useWalletClient } from "wagmi"
 
 import { StepApproveProtection } from "../components/onboarding/StepApproveProtection";
 import { StepConnectWallet } from "../components/onboarding/StepConnectWallet";
+import { ChainGPTSetup } from "../components/onboarding/ChainGPTSetup";
 import { StepDeployProtection } from "../components/onboarding/StepDeployProtection";
 import { StepDrainerCheck } from "../components/onboarding/StepDrainerCheck";
 import { StepAlerts, StepRules, StepWhitelist } from "../components/onboarding/StepProConfig";
@@ -24,6 +25,7 @@ import { trackEvent } from "../utils/analytics";
 const STEP_META: Record<WizardStepId, { title: string; description: string }> = {
   connect: { title: "Connect wallet", description: "Pick the wallet to protect" },
   drainer: { title: "Safety check", description: "Detect an active sweeper" },
+  chaingpt: { title: "ChainGPT AI", description: "Optional AI setup" },
   "safe-address": { title: "Safe address", description: "Where funds are rescued to" },
   assets: { title: "Select assets", description: "Scan ERC-20 balances" },
   deploy: { title: "Deploy protection", description: "Create the vault contract" },
@@ -213,6 +215,9 @@ export function Setup() {
 
       case "drainer":
         return <StepDrainerCheck onBack={() => goTo(activeIndex - 1)} onContinue={() => goTo(activeIndex + 1)} />;
+
+      case "chaingpt":
+        return <ChainGPTSetup onContinue={() => goTo(activeIndex + 1)} />;
 
       case "safe-address":
         return (

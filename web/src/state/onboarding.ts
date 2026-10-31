@@ -9,6 +9,7 @@ import { persist } from "zustand/middleware";
 export type WizardStepId =
   | "connect"
   | "drainer"
+  | "chaingpt"
   | "safe-address"
   | "assets"
   | "deploy"
@@ -22,6 +23,7 @@ export type WizardStepId =
 export const BEGINNER_STEPS: readonly WizardStepId[] = [
   "connect",
   "drainer",
+  "chaingpt",
   "safe-address",
   "assets",
   "deploy",
