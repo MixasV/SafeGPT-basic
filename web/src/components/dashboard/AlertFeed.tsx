@@ -1,3 +1,6 @@
+import { useState } from "react";
+
+import { chaingpt } from "../../services/chaingpt/client";
 import type { AlertAction, AlertSeverity, DemoAlert } from "../../mocks/dashboard-mocks";
 
 interface AlertFeedProps {
@@ -42,6 +45,8 @@ function relativeTime(minutesAgo: number): string {
  * what happened; the plain sentence does.
  */
 export function AlertFeed({ alerts, isDemo, isPro, hasBotConfigured }: AlertFeedProps) {
+  const [explanations, setExplanations] = useState<Record<string, string>>({});
+  const [loadingId, setLoadingId] = useState<string | null>(null);
   return (
     <section
       aria-label="Recent activity"
@@ -87,8 +92,38 @@ export function AlertFeed({ alerts, isDemo, isPro, hasBotConfigured }: AlertFeed
                     )}
                   </div>
 
-                  <p className="mt-1 text-sm text-text-primary">{alert.description}</p>
-                  <p className="mt-0.5 text-xs text-text-secondary">{ACTION_LABELS[alert.action]}</p>
+                   <p className="mt-1 text-sm text-text-primary">{alert.description}</p>
+                   <p className="mt-0.5 text-xs text-text-secondary">{ACTION_LABELS[alert.action]}</p>
+
+                   <div className="mt-2 flex items-center gap-2">
+                     <button
+                       onClick={async () => {
+                         if (!chaingpt.isAvailable()) return;
+                         setLoadingId(alert.id);
+                         try {
+                           const r = await chaingpt.explainAlert({
+                             rule: alert.ruleId,
+                             description: alert.description,
+                             severity: alert.severity,
+                             action: alert.action,
+                           });
+                           setExplanations((prev) => ({ ...prev, [alert.id]: r.data.markdown }));
+                         } finally {
+                           setLoadingId(null);
+                         }
+                       }}
+                       disabled={!chaingpt.isAvailable() || loadingId === alert.id}
+                       className="rounded border border-border px-2 py-1 text-xs text-text-secondary disabled:opacity-50"
+                       title={!chaingpt.isAvailable() ? "Requires ChainGPT API key (Settings)" : ""}
+                     >
+                       {loadingId === alert.id ? "Explaining..." : "🤖 Explain"}
+                     </button>
+                   </div>
+                   {explanations[alert.id] && (
+                     <div className="mt-2 rounded border border-border bg-bg-secondary p-2 text-xs text-text-secondary">
+                       🤖 AI Explanation: {explanations[alert.id]}
+                     </div>
+                   )}
                 </div>
               </li>
             );

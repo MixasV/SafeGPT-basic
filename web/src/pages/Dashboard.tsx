@@ -5,6 +5,7 @@ import { trackEvent } from "../utils/analytics";
 
 import { AlertFeed } from "../components/dashboard/AlertFeed";
 import { AiSecurityReview } from "../components/dashboard/AiSecurityReview";
+import { AskAI } from "../features/dashboard/AskAI";
 import { ProtectionStatusPanel } from "../components/dashboard/ProtectionStatus";
 import { QuickActions } from "../components/dashboard/QuickActions";
 import { RescueHistory } from "../components/dashboard/RescueHistory";
@@ -148,6 +149,8 @@ async function handleReapprove(entry: TokenStatusInfo): Promise<void> {
       </div>
 
       <AiSecurityReview />
+
+      <AskAI />
 
       <div className="grid gap-5 lg:grid-cols-2">
         <AlertFeed

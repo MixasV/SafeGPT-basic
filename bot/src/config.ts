@@ -247,6 +247,7 @@ function parseWallet(value: unknown, index: number): WalletConfig {
 }
 
 /** Reads and validates a config file. Performs no network access. */
+
 export function loadConfig(path: string): BotConfig {
   let raw: string;
   try {
@@ -393,3 +394,5 @@ export async function validateAgainstChain(config: BotConfig, provider: RpcReade
 
   return warnings;
 }
+
+
