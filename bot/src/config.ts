@@ -280,6 +280,10 @@ export function loadConfig(path: string): BotConfig {
     throw new ConfigError(`rpcHttp must be an http:// or https:// URL, got "${rpcHttp}".`);
   }
 
+  const rpcHttpFallbacks = Array.isArray(record.rpcHttpFallbacks)
+    ? record.rpcHttpFallbacks.map((v, i) => requireString(v, `rpcHttpFallbacks[${i}]`))
+    : [];
+
   if (!Array.isArray(record.wallets) || record.wallets.length === 0) {
     throw new ConfigError("wallets is required and must contain at least one entry.");
   }
@@ -328,6 +332,7 @@ export function loadConfig(path: string): BotConfig {
   return {
     rpcWss,
     rpcHttp,
+    rpcHttpFallbacks,
     chainId: requireNumber(record.chainId, "chainId"),
     flashbotsRelay: optionalString(record.flashbotsRelay, "flashbotsRelay") ?? "",
     wallets,

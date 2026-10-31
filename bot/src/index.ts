@@ -2,7 +2,7 @@ import { config as loadDotenv } from "dotenv";
 import { JsonRpcProvider, Signer, Wallet, WebSocketProvider } from "ethers";
 import { join } from "node:path";
 
-import { CompositeAlerter, ConsoleAlerter, WebhookAlerter, type AlertSink } from "./alerts.js";
+import { CompositeAlerter, ConsoleAlerter, WebhookAlerter, buildAlert, type AlertSink } from "./alerts.js";
 import { ConfigError, loadConfig, validateAgainstChain } from "./config.js";
 import { Executor, type ExecutorSigner, type RescueOutcome } from "./executor.js";
 import { Monitor, ReconnectExhaustedError, type MonitorProvider, type Rescuer } from "./monitor.js";
@@ -221,13 +221,17 @@ async function main(): Promise<void> {
 
   const minExecutorEth = BigInt(Math.round(config.alerts.minExecutorEth * 1e18));
 
+  const executorAddresses: string[] = [];
   const executors = await Promise.all(
     config.wallets.map(async (wallet) => {
-      const executor = new Executor(await signerFor(wallet, http), http, {
+      const signer = await signerFor(wallet, http);
+      const executor = new Executor(signer, http, {
         dryRun: options.dryRun,
         minExecutorEth,
+        maxGasPriceGwei: 0n,
         log,
       });
+      executorAddresses.push(await signer.getAddress());
       executorByWallet.set(wallet.label, executor);
       return { wallet, executor };
     }),
@@ -264,6 +268,30 @@ async function main(): Promise<void> {
   };
   process.on("SIGINT", () => shutdown("SIGINT"));
   process.on("SIGTERM", () => shutdown("SIGTERM"));
+
+  const balanceCheck = setInterval(async () => {
+    for (let i = 0; i < executorAddresses.length; i++) {
+      try {
+        const addr = executorAddresses[i] as string;
+        const bal = await http.getBalance(addr);
+        if (bal < minExecutorEth) {
+          await alerter.deliver(
+            buildAlert({
+              wallet: "system",
+              rule: "NONE",
+              severity: "HIGH",
+              reason: `Executor ${addr} balance ${bal} wei below floor ${minExecutorEth} wei.`,
+              action: "ALERT",
+              now: Date.now(),
+            }),
+          );
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }, 5 * 60 * 1000);
+  balanceCheck.unref();
 
   try {
     await monitor.run(controller.signal);

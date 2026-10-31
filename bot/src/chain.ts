@@ -92,6 +92,32 @@ export function createTokenReader(provider: RpcReader): TokenReader {
   };
 }
 
+/** Creates an RpcReader that tries multiple HTTP endpoints in order. */
+export function createMultiRpcReader(urls: string[]): RpcReader {
+  const endpoints = urls.filter((u) => u.trim() !== "");
+  if (endpoints.length === 0) throw new Error("No RPC endpoints provided");
+  return {
+    async send(method: string, params: unknown[]): Promise<unknown> {
+      let lastError: unknown;
+      for (const url of endpoints) {
+        try {
+          const response = await fetch(url, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const data = (await response.json()) as { result?: unknown; error?: { message?: string } };
+          if (data.error) throw new Error(data.error.message ?? "RPC error");
+          return data.result;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      throw lastError instanceof Error ? lastError : new Error("All RPC endpoints failed");
+    },
+  };
+}
 function padAddress(address: string): string {
   return address.toLowerCase().replace(/^0x/, "").padStart(64, "0");
 }

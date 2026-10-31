@@ -58,6 +58,7 @@ export interface AlertsConfig {
 export interface BotConfig {
   rpcWss: string;
   rpcHttp: string;
+  rpcHttpFallbacks?: string[];
   chainId: number;
   /** Empty disables private bundles; rescue then goes through the public mempool. */
   flashbotsRelay: string;
