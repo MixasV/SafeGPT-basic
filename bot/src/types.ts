@@ -87,6 +87,7 @@ export type Severity = "CRITICAL" | "HIGH" | "MEDIUM";
 export type RuleId =
   | "R1_APPROVE_UNKNOWN"
   | "R2_TRANSFER_UNKNOWN"
+  | "R2_NATIVE_ETH_TRANSFER"
   | "R3_CALL_UNKNOWN"
   | "R4_EIP7702"
   | "R5_MASS_TRANSFERS"

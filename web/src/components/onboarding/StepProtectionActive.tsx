@@ -25,11 +25,37 @@ export function StepProtectionActive({
 }: StepProtectionActiveProps) {
   const protectedAssets = assets.filter((asset) => asset.selected);
 
+  const handleExport = () => {
+    const config = {
+      version: 1,
+      chainId,
+      vault: { address: vaultAddress },
+      protectedWallet: account,
+      safeAddress,
+      tokens: protectedAssets.map((a) => ({ symbol: a.symbol, address: a.address, approved: true })),
+      generatedAt: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "wizard-export.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <StepFrame
       title="Protection active"
       subtitle="Your wallet is now monitored for suspicious outgoing transactions."
-      footer={<PrimaryButton onClick={onFinish}>Go to Dashboard</PrimaryButton>}
+      footer={
+        <div className="flex gap-2">
+          <PrimaryButton onClick={onFinish}>Go to Dashboard</PrimaryButton>
+          <button onClick={handleExport} className="rounded-lg border border-border px-3 py-2 text-sm text-text-primary">
+            Download config
+          </button>
+        </div>
+      }
     >
       <div className="flex items-center gap-3 rounded-lg border border-accent-green/40 bg-accent-green/10 p-4">
         <StatusBadge tone="active" label="ACTIVE" />

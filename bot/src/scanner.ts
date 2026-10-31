@@ -1,4 +1,5 @@
 import { createTokenReader, type RpcReader, type TokenReader } from "./chain.js";
+import { id } from "ethers";
 import type { RuleId, Severity, WalletConfig, WalletSnapshot } from "./types.js";
 
 export type { TokenReader };
@@ -168,6 +169,37 @@ export class Scanner {
         tokens: [],
         blockNumber,
       });
+    }
+
+    // Permit (ERC-2612) detection: Approval events where spender != vault.
+    const approvalTopic = id("Approval(address,address,uint256)");
+    for (const token of tokens) {
+      try {
+        const logs = (await this.provider().send("eth_getLogs", [
+          {
+            address: token.address,
+            topics: [approvalTopic, `0x${wallet.protectedWallet.toLowerCase().replace(/^0x/, "").padStart(64, "0")}`],
+            fromBlock: `0x${blockNumber.toString(16)}`,
+            toBlock: `0x${blockNumber.toString(16)}`,
+          },
+        ])) as { topics?: string[] }[];
+        for (const log of logs ?? []) {
+          const spender = `0x${(log.topics?.[2] ?? "").slice(26)}`;
+          if (spender.toLowerCase() !== wallet.vaultAddress.toLowerCase()) {
+            findings.push({
+              wallet,
+              rule: "R1_APPROVE_UNKNOWN",
+              action: "RESCUE",
+              severity: "CRITICAL",
+              reason: `Permit/approval detected for non-vault spender ${spender} on ${token.symbol}.`,
+              tokens: wallet.coreTokens.map((t) => t.address),
+              blockNumber,
+            });
+          }
+        }
+      } catch {
+        // ignore RPC errors
+      }
     }
 
     // The suppression covers exactly one scan — the block in which our own

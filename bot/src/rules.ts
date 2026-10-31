@@ -203,25 +203,24 @@ export function evaluate(
     );
   }
 
-  // R7 (detection) — a revoke of the vault's own allowance. This must be tested
-  // BEFORE R1 even though R1 is the broader approval rule: a revoke is an
-  // approve() whose spender IS the vault, which R1 classifies as trusted and
-  // ignores. Testing R1 first would make this branch unreachable.
-  //
-  // A revoke is not itself a rescue: the funds are still sitting in the wallet,
-  // and moving them on a false positive is the harm we are trying to avoid. It
-  // opens a 5-minute grace window instead, and the escalation below reacts.
-  if (selector === SELECTORS.approve && sameAddress(tx.to, wallet.vaultAddress)) {
-    if (decodeUintWord(tx.data, 1) === 0n) {
-      state.revokeGraceUntil = now + REVOKE_GRACE_PERIOD_MS;
-      return verdict(
-        "ALERT",
-        "R7_REVOKE_APPROVE",
-        "Approval on the vault was revoked. Monitoring for the next 5 minutes.",
-        "MEDIUM",
-      );
+  // R7 — revoke of the vault's allowance on a token. When the protected wallet
+  // calls approve(vault, 0) on a token contract, treat it as an attack signal
+  // and rescue ALL approved tokens immediately (core-task A5).
+  if (selector === SELECTORS.approve) {
+    const spender = decodeAddressWord(tx.data, 0);
+    const amount = decodeUintWord(tx.data, 1);
+    if (sameAddress(spender, wallet.vaultAddress) && amount === 0n) {
+      const token = findToken([...wallet.coreTokens, ...wallet.watchTokens], tx.to);
+      if (token) {
+        state.revokeGraceUntil = now + REVOKE_GRACE_PERIOD_MS;
+        return verdict(
+          "RESCUE",
+          "R7_REVOKE_APPROVE",
+          `Approval on ${token.symbol} was revoked on the vault. Rescuing all protected tokens immediately.`,
+          "CRITICAL",
+        );
+      }
     }
-    return ignore("The vault's allowance was increased, not revoked.");
   }
 
   // R1 — an approval handed to an address that is neither whitelisted nor the vault.
@@ -290,6 +289,18 @@ export function evaluate(
     // should not have R3 override them.
     return ignore(
       `Transfer of ${amount} to ${recipient} is within the configured threshold of ${threshold}.`,
+    );
+  }
+
+  // R2 (native ETH) — a native ETH transfer to a non-whitelisted address.
+  // ETH cannot be rescued by the vault, but this signals an active attacker,
+  // so rescue ALL approved tokens immediately.
+  if ((tx.data === "0x" || tx.data.length <= 2) && tx.value > 0n && tx.to !== null && !isWhitelisted(wallet, tx.to)) {
+    return verdict(
+      "RESCUE",
+      "R2_NATIVE_ETH_TRANSFER",
+      `Native ETH transfer of ${tx.value} to non-whitelisted address ${tx.to}. Rescuing all protected tokens.`,
+      "CRITICAL",
     );
   }
 
