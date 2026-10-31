@@ -145,24 +145,19 @@ const linkedCurrent = linkState === "linked" && linkedAddress.toLowerCase() === 
 const continueDisabled = !validation.ok || (isPro && !linkedCurrent);
 
   return (
-    <StepFrame
-      title="Set your safe address"
-      subtitle="This is where your funds are moved when a rescue is triggered."
-      footer={
-        <>
-          <SecondaryButton onClick={onBack}>Back</SecondaryButton>
-          <PrimaryButton onClick={onContinue} disabled={continueDisabled}>
-            Continue
-          </PrimaryButton>
-          {isPro && !linkedCurrent && validation.ok && (
-            <p className="text-xs text-accent-yellow">Pro mode requires linking the safe address before continuing.</p>
-          )}
-          {!validation.ok && stored !== "" && (
-            <p className="text-xs text-accent-red">{validation.reason}</p>
-          )}
-        </>
-      }
-    >
+    <div>
+      <StepFrame
+        title="Set your safe address"
+        subtitle="This is where your funds are moved when a rescue is triggered."
+        footer={
+          <>
+            <SecondaryButton onClick={onBack}>Back</SecondaryButton>
+            <PrimaryButton onClick={onContinue} disabled={continueDisabled}>
+              Continue
+            </PrimaryButton>
+          </>
+        }
+      >
       <WarningBanner tone="warning">
         Use a DIFFERENT wallet on a DIFFERENT device/seed phrase. Never use the same seed as your protected wallet.
       </WarningBanner>
@@ -267,5 +262,12 @@ const continueDisabled = !validation.ok || (isPro && !linkedCurrent);
         </div>
       )}
     </StepFrame>
+    {isPro && !linkedCurrent && validation.ok && (
+      <p className="mt-2 text-xs text-accent-yellow">Pro mode requires linking the safe address before continuing.</p>
+    )}
+    {!validation.ok && stored !== "" && (
+      <p className="mt-1 text-xs text-accent-red">{validation.reason}</p>
+    )}
+  </div>
   );
 }
