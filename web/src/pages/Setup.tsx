@@ -88,6 +88,10 @@ export function Setup() {
       setWalletAddress("");
       return;
     }
+    if (walletAddress === "") {
+      setWalletAddress(account);
+      return;
+    }
     if (account !== walletAddress) {
       reset();
       setWalletAddress(account);
