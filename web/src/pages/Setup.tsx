@@ -397,11 +397,15 @@ export function Setup() {
         <button
           type="button"
           onClick={() => {
+            localStorage.removeItem("safegpt-onboarding");
+            localStorage.removeItem("safegpt_quiz_completed");
             reset();
+            setWalletAddress("");
             setExecutor("0x0000000000000000000000000000000000000000");
             setFeeReceiver("0x0000000000000000000000000000000000000000");
             setFeeBps(DEFAULT_FEE_BPS);
             setChainId(chainId);
+            window.location.reload();
           }}
           className="text-xs text-text-secondary underline underline-offset-4 hover:text-text-primary"
         >
