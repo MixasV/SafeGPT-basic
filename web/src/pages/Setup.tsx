@@ -150,6 +150,21 @@ export function Setup() {
     [setStep, mode],
   );
 
+  useEffect(() => {
+    if (step !== "quiz") return;
+    try {
+      const raw = localStorage.getItem("safegpt_quiz_completed");
+      if (raw) {
+        const parsed = JSON.parse(raw) as { version?: number };
+        if (parsed.version === 1) {
+          goTo(activeIndex + 1);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [step, activeIndex, goTo]);
+
   /** Ends the wizard from any step, Pro or Beginner. */
   const finishWizard = useCallback(() => {
     complete();
