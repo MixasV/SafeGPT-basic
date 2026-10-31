@@ -60,10 +60,12 @@ export function Setup() {
   const {
     step,
     chainId,
+    walletAddress,
     safeAddress,
     vaultAddress,
     assets,
     setStep,
+    setWalletAddress,
     setAssets,
     setChainId,
     setNativeBalance,
@@ -78,6 +80,19 @@ export function Setup() {
   const [wrapError, setWrapError] = useState("");
 
   const account = (DEMO_MODE ? DEMO_ADDRESSES.wallet : address) as Address | undefined;
+
+  useEffect(() => {
+    if (DEMO_MODE) return;
+    if (!account) {
+      reset();
+      setWalletAddress("");
+      return;
+    }
+    if (account !== walletAddress) {
+      reset();
+      setWalletAddress(account);
+    }
+  }, [account, walletAddress, reset, setWalletAddress]);
 
   // Default the executor and fee receiver to the connected wallet so the wizard
   // works out of the box; Pro mode exposes both for a self-hosted deployment.

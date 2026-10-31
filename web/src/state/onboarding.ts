@@ -79,6 +79,7 @@ export interface AlertSettings {
 
 interface OnboardingState {
   step: WizardStepId;
+  walletAddress: string;
   safeAddress: string;
   /** Safe address linked to the platform account by a signature (UPD-3, Sprint 7). */
   safeAddressLinked: boolean;
@@ -99,6 +100,7 @@ interface OnboardingState {
   completed: boolean;
 
   setStep: (step: WizardStepId) => void;
+  setWalletAddress: (address: string) => void;
   setSafeAddress: (address: string) => void;
   setSafeAddressLinked: (linked: boolean) => void;
   setVaultAddress: (address: string) => void;
@@ -121,6 +123,7 @@ interface OnboardingState {
 
 const INITIAL = {
   step: "connect" as WizardStepId,
+  walletAddress: "",
   safeAddress: "",
   safeAddressLinked: false,
   vaultAddress: "",
@@ -155,6 +158,7 @@ export const useOnboardingStore = create<OnboardingState>()(
       ...INITIAL,
 
       setStep: (step) => set({ step }),
+      setWalletAddress: (walletAddress) => set({ walletAddress }),
       setSafeAddress: (safeAddress) => set({ safeAddress }),
       setSafeAddressLinked: (safeAddressLinked) => set({ safeAddressLinked }),
       setVaultAddress: (vaultAddress) => set({ vaultAddress }),
