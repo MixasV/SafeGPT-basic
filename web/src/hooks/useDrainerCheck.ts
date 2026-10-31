@@ -16,7 +16,7 @@ export type DrainerCheckPhase =
   | "idle"
   /** Reading the starting balance. */
   | "recording"
-  /** Balance captured вЂ” waiting for the user to send the test deposit. */
+  /** Balance captured — waiting for the user to send the test deposit. */
   | "awaiting-deposit"
   /** Waiting for two blocks to elapse. */
   | "checking"
@@ -71,7 +71,7 @@ function formatEth(wei: bigint): string {
  * means an active sweeper is draining the wallet.
  *
  * This check detects ACTIVE ETH sweepers only. It does NOT detect token-specific
- * drainers, dormant compromises, or malicious approvals вЂ” the UI repeats that.
+ * drainers, dormant compromises, or malicious approvals — the UI repeats that.
  */
 export function useDrainerCheck(publicClient: PublicClient | undefined, account: Address | undefined): UseDrainerCheck {
   const setDrainer = useOnboardingStore((state) => state.setDrainer);

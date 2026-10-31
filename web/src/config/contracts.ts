@@ -1,4 +1,4 @@
-import type { Abi, Address, Hex } from "viem";
+﻿import type { Abi, Address, Hex } from "viem";
 import { arbitrum, base, mainnet, sepolia } from "wagmi/chains";
 
 import artifacts from "./artifacts.json";

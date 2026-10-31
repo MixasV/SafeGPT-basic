@@ -1,4 +1,4 @@
-import { explorerAddressUrl } from "../../config/tokens";
+﻿import { explorerAddressUrl } from "../../config/tokens";
 import type { ProtectionStatus } from "../../dashboard/status";
 
 interface QuickActionsProps {
@@ -93,7 +93,7 @@ export function QuickActions({
             ? "One asset needs your approval before it can be protected again."
             : `${status.counts.needsReapprove} assets need your approval before they can be protected again.`}
           {isPro
-            ? " Use “Re-approve” in the asset table."
+            ? " Use вЂњRe-approveвЂќ in the asset table."
             : " Switch to Pro mode to re-approve from this page."}
         </p>
       )}

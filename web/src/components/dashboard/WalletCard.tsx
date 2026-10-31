@@ -1,4 +1,4 @@
-import { explorerAddressUrl, chainName } from "../../config/tokens";
+﻿import { explorerAddressUrl, chainName } from "../../config/tokens";
 import type { ProtectionStatus } from "../../dashboard/status";
 
 interface WalletCardProps {

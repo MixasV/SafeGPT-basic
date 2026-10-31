@@ -1,4 +1,4 @@
-import { explorerTxUrl } from "../../config/tokens";
+﻿import { explorerTxUrl } from "../../config/tokens";
 import type { RescueBatch, RescueHistoryState, RescueOutcome } from "../../hooks/useRescueEvents";
 
 interface RescueHistoryProps {

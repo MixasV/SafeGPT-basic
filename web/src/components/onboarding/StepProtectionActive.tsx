@@ -1,4 +1,4 @@
-import type { Address } from "viem";
+﻿import type { Address } from "viem";
 
 import { explorerAddressUrl } from "../../config/tokens";
 import type { SelectedAsset } from "../../state/onboarding";
@@ -109,3 +109,4 @@ export function StepProtectionActive({
     </StepFrame>
   );
 }
+

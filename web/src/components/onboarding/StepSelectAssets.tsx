@@ -29,7 +29,7 @@ const UNVERIFIED_WARNING =
   "Never interact with unverified tokens after they arrive.";
 
 /**
- * Step 4 вЂ” Select assets. ERC-20 balances come from the three-level scan of
+ * Step 4 — Select assets. ERC-20 balances come from the three-level scan of
  * UPD-4; native ETH is listed separately because the vault cannot move it.
  *
  * Every token is classified against the curated per-network list from
@@ -91,7 +91,7 @@ export function StepSelectAssets({
       address: outcome.token.address,
       symbol: outcome.token.symbol,
       decimals: outcome.token.decimals,
-      // Pre-registered tokens usually have no balance yet вЂ” approve works anyway.
+      // Pre-registered tokens usually have no balance yet — approve works anyway.
       balance: "0",
       selected: true,
       verified: outcome.verified,
@@ -117,7 +117,7 @@ export function StepSelectAssets({
     >
       <div className="flex flex-wrap items-center gap-3">
         <PrimaryButton onClick={() => void runScan()} disabled={loading || (!account && !DEMO_MODE)}>
-          {loading ? "ScanningвЂ¦" : assets.length === 0 ? "Scan wallet" : "Rescan"}
+          {loading ? "Scanning…" : assets.length === 0 ? "Scan wallet" : "Rescan"}
         </PrimaryButton>
         {isPro && <StatusBadge tone="neutral" label={`Source: ${source}`} />}
       </div>
@@ -132,7 +132,7 @@ export function StepSelectAssets({
         <>
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <span className="text-text-secondary">
-              {coreCount} in Core В· {watchCount} in Watch
+              {coreCount} in Core · {watchCount} in Watch
             </span>
             <StatusBadge tone={coreCount > 0 ? "active" : "alert"} label={`CORE ${coreCount}`} />
             <StatusBadge tone={watchCount > 0 ? "alert" : "neutral"} label={`WATCH ${watchCount}`} />
@@ -218,15 +218,15 @@ export function StepSelectAssets({
 
       <div className="rounded-lg border border-accent-yellow/40 bg-accent-yellow/10 p-4">
         <p className="text-sm font-semibold text-accent-yellow">
-          вљ пёЏ Native ETH cannot be protected directly. We recommend wrapping it to WETH.
+          ⚠️ Native ETH cannot be protected directly. We recommend wrapping it to WETH.
         </p>
         <p className="mt-1 text-sm text-text-secondary">
           Balance: {nativeFormatted} ETH on {chainName(chainId)}
-          {wethAddress ? ` В· WETH ${wethAddress}` : " В· WETH is not available on this network"}
+          {wethAddress ? ` · WETH ${wethAddress}` : " · WETH is not available on this network"}
         </p>
         {wethAddress && Number(nativeBalanceWei) > 0n && (
           <PrimaryButton onClick={() => void onWrapEth(nativeBalanceWei)} disabled={wrapping} className="mt-3">
-            {wrapping ? "WrappingвЂ¦" : "Wrap ETH в†’ WETH"}
+            {wrapping ? "Wrapping…" : "Wrap ETH → WETH"}
           </PrimaryButton>
         )}
       </div>
@@ -239,7 +239,7 @@ export function StepSelectAssets({
               value={manualAddress}
               onChange={(event) => setManualAddress(event.target.value)}
               spellCheck={false}
-              placeholder="0xвЂ¦"
+              placeholder="0x…"
               aria-label="Token contract address"
               className="min-w-0 flex-1 rounded-lg border border-border bg-bg-primary px-3 py-2 font-mono text-sm text-text-primary outline-none focus:border-accent"
             />
@@ -253,7 +253,7 @@ export function StepSelectAssets({
     )}
 
     {/* An unverified contract has no verified source, and an auditor needs
-        source rather than an address вЂ” which is precisely why it is unverified.
+        source rather than an address — which is precisely why it is unverified.
         There is no auditor in this repository to link to: it is a platform
         surface. Say the reason and stop, rather than promising a tool that is
         not here. */}
@@ -275,7 +275,7 @@ export function StepSelectAssets({
               .filter((asset) => asset.selected)
               .map((asset) => (
                 <p key={asset.address} className="truncate font-mono text-xs text-text-secondary">
-                  approve({asset.address}) в†’ {buildApproveCalldata(vaultAddress, maxUint256)}
+                  approve({asset.address}) → {buildApproveCalldata(vaultAddress, maxUint256)}
                 </p>
               ))}
         </div>
@@ -285,4 +285,7 @@ export function StepSelectAssets({
     </StepFrame>
   );
 }
+
+
+
 

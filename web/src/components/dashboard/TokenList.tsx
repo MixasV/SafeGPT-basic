@@ -1,4 +1,4 @@
-import type { TokenStatusInfo } from "../../dashboard/status";
+﻿import type { TokenStatusInfo } from "../../dashboard/status";
 
 interface TokenListProps {
   tokens: TokenStatusInfo[];

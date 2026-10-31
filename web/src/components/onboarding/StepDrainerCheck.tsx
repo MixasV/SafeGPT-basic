@@ -1,4 +1,4 @@
-import { useAccount, usePublicClient } from "wagmi";
+﻿import { useAccount, usePublicClient } from "wagmi";
 import { formatEther, type Address } from "viem";
 
 import { DEMO_MODE } from "../../config/demo";
@@ -87,7 +87,7 @@ export function StepDrainerCheck({ onContinue, onBack }: StepDrainerCheckProps) 
       )}
 
       {status === "compromised" && (
-        <WarningBanner tone="danger" title="❌ DANGER: Your wallet appears compromised.">
+        <WarningBanner tone="danger" title="вќЊ DANGER: Your wallet appears compromised.">
           <p>
             A drainer is actively sweeping funds. DO NOT deposit more funds. Create a new wallet immediately.
           </p>
