@@ -78,7 +78,7 @@ export function ChainGPTSetup({ onContinue }: { onContinue?: () => void }) {
       {status && <p className="text-xs text-text-secondary">{status}</p>}
       {!chaingpt.isAvailable() && (
         <p className="text-xs text-text-secondary">
-          Status: вќЊ Not configured. Add key to enable AI features.
+          Status: ❌ Not configured. Add key to enable AI features.
         </p>
       )}
     </div>

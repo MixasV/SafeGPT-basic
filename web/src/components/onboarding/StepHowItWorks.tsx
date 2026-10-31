@@ -16,23 +16,23 @@
       <section className="space-y-3">
         <h3 className="text-sm font-semibold text-text-primary">What SafeGPT CANNOT Protect Against</h3>
         <ul className="space-y-2 text-sm text-text-secondary">
-          <li>вќЊ Private mempool / private RPC transactions — Bot monitors public mempool only.</li>
-          <li>вќЊ Native ETH theft — ETH has no approve/transferFrom. Wrap ETH → WETH for protection, or use Guardian Module.</li>
-          <li>вќЊ Tokens without prior approve — The vault can only rescue tokens you have approved in advance.</li>
-          <li>вќЊ Bot is offline or RPC is down — No one calls rescue(). Protection requires the bot running 24/7.</li>
-          <li>вќЊ Sweeper bots on compromised wallet — If attacker drains any incoming ETH instantly, you cannot send ETH for gas.</li>
+          <li>❌ Private mempool / private RPC transactions — Bot monitors public mempool only.</li>
+          <li>❌ Native ETH theft — ETH has no approve/transferFrom. Wrap ETH → WETH for protection, or use Guardian Module.</li>
+          <li>❌ Tokens without prior approve — The vault can only rescue tokens you have approved in advance.</li>
+          <li>❌ Bot is offline or RPC is down — No one calls rescue(). Protection requires the bot running 24/7.</li>
+          <li>❌ Sweeper bots on compromised wallet — If attacker drains any incoming ETH instantly, you cannot send ETH for gas.</li>
         </ul>
       </section>
 
       <section className="space-y-3">
         <h3 className="text-sm font-semibold text-text-primary">Your Responsibilities</h3>
         <ul className="space-y-2 text-sm text-text-secondary">
-          <li>рџ”§ Keep the bot running 24/7 (your PC, VPS, or server)</li>
-          <li>рџ”§ Keep the executor wallet funded with ETH for gas (~0.01-0.05 ETH)</li>
-          <li>рџ”§ Approve new tokens manually when you receive them</li>
-          <li>рџ”§ Do NOT use the protected wallet for trading, swaps, or dApps</li>
-          <li>рџ”§ Monitor alerts and act on warnings</li>
-          <li>рџ”§ Keep your safe address key secure (separate from protected wallet)</li>
+          <li>🔧 Keep the bot running 24/7 (your PC, VPS, or server)</li>
+          <li>🔧 Keep the executor wallet funded with ETH for gas (~0.01-0.05 ETH)</li>
+          <li>🔧 Approve new tokens manually when you receive them</li>
+          <li>🔧 Do NOT use the protected wallet for trading, swaps, or dApps</li>
+          <li>🔧 Monitor alerts and act on warnings</li>
+          <li>🔧 Keep your safe address key secure (separate from protected wallet)</li>
         </ul>
       </section>
 

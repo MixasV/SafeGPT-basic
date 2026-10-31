@@ -36,7 +36,7 @@ export function AskAI() {
 
   return (
     <div className="rounded-2xl border border-border bg-surface p-4 space-y-3">
-      <h3 className="text-sm font-semibold text-text-primary">рџ’¬ AI Security Assistant</h3>
+      <h3 className="text-sm font-semibold text-text-primary">🔧’¬ AI Security Assistant</h3>
       <p className="text-xs text-text-secondary">Powered by ChainGPT AI</p>
       {!chaingpt.isAvailable() && (
         <p className="text-xs text-text-secondary">
@@ -46,7 +46,7 @@ export function AskAI() {
       <div className="max-h-64 space-y-2 overflow-y-auto">
         {messages.slice(-10).map((m, i) => (
           <div key={i} className={`text-sm ${m.role === "user" ? "text-text-primary" : "text-text-secondary"}`}>
-            {m.role === "user" ? "You: " : "рџ¤–: "}
+            {m.role === "user" ? "You: " : "🔧¤–: "}
             {m.role === "assistant" ? <MarkdownRenderer markdown={m.text} /> : m.text}
           </div>
         ))}
