@@ -37,11 +37,11 @@ export function ChainGPTSetup({ onContinue }: { onContinue?: () => void }) {
             </tr>
           </thead>
           <tbody>
-            <tr className="border-b border-border"><td className="px-3 py-2">в—‹ Manual token selection (might miss tokens)</td><td className="px-3 py-2">✅ AI checks coverage gaps</td></tr>
-            <tr className="border-b border-border"><td className="px-3 py-2">в—‹ No config validation (deploy and hope)</td><td className="px-3 py-2">✅ AI validates safe address, network, thresholds</td></tr>
-            <tr className="border-b border-border"><td className="px-3 py-2">в—‹ No contract audit (trust the code)</td><td className="px-3 py-2">✅ AI audits your vault contract</td></tr>
-            <tr className="border-b border-border"><td className="px-3 py-2">в—‹ Alerts = raw data</td><td className="px-3 py-2">✅ AI explains alerts in plain language</td></tr>
-            <tr className="border-b border-border"><td className="px-3 py-2">в—‹ Self-guided setup</td><td className="px-3 py-2">✅ AI advisor through every step</td></tr>
+            <tr className="border-b border-border"><td className="px-3 py-2">○ Manual token selection (might miss tokens)</td><td className="px-3 py-2">✅ AI checks coverage gaps</td></tr>
+            <tr className="border-b border-border"><td className="px-3 py-2">○ No config validation (deploy and hope)</td><td className="px-3 py-2">✅ AI validates safe address, network, thresholds</td></tr>
+            <tr className="border-b border-border"><td className="px-3 py-2">○ No contract audit (trust the code)</td><td className="px-3 py-2">✅ AI audits your vault contract</td></tr>
+            <tr className="border-b border-border"><td className="px-3 py-2">○ Alerts = raw data</td><td className="px-3 py-2">✅ AI explains alerts in plain language</td></tr>
+            <tr className="border-b border-border"><td className="px-3 py-2">○ Self-guided setup</td><td className="px-3 py-2">✅ AI advisor through every step</td></tr>
             <tr><td className="px-3 py-2">Protection Score: ~60%</td><td className="px-3 py-2">Protection Score: ~85%</td></tr>
           </tbody>
         </table>
