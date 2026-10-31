@@ -2,6 +2,7 @@ import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import { Layout } from "./components/Layout";
 import { Dashboard } from "./pages/Dashboard";
+import { ContractAuditor } from "./pages/ContractAuditor";
 import { Settings } from "./pages/Settings";
 import { Setup } from "./pages/Setup";
 
@@ -27,6 +28,7 @@ export function App() {
         <Route element={<Layout />}>
           <Route path="/setup" element={<Setup />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/auditor" element={<ContractAuditor />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/setup" replace />} />
         </Route>
