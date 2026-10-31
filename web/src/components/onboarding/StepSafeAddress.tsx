@@ -245,6 +245,12 @@ const continueDisabled = !validation.ok || (isPro && !linkedCurrent);
             </PrimaryButton>
           )}
         </div>
+        {isPro && !linkedCurrent && validation.ok && (
+          <p className="mt-2 text-xs text-accent-yellow">Pro mode requires linking the safe address before continuing.</p>
+        )}
+        {!validation.ok && stored !== "" && (
+          <p className="mt-1 text-xs text-accent-red">{validation.reason}</p>
+        )}
       </div>
 
       {isPro && (
