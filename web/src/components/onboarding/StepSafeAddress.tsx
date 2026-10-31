@@ -213,9 +213,9 @@ const continueDisabled = !validation.ok || (isPro && !linkedCurrent);
         </div>
 
         <WarningBanner tone="info">
-          Platform login uses the SAFE wallet signature, never the protected wallet. Weakening any protection setting
-          requires the safe key plus a 24-hour delay — a stolen protected-wallet key cannot disable your own
-          protection.
+          Platform login uses the SAFE wallet signature, never the protected wallet. To sign, switch your wallet to the
+          safe address ({safeWallet}) in MetaMask, then click &quot;Sign with the safe wallet&quot;. Weakening any
+          protection setting requires the safe key plus a 24-hour delay.
         </WarningBanner>
 
         {linkError && <p className="text-sm text-accent-red">{linkError}</p>}
