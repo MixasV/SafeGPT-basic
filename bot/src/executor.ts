@@ -57,6 +57,8 @@ export interface ExecutorOptions {
   dryRun: boolean;
   /** Executors below this balance cannot reliably pay for gas. */
   minExecutorEth: bigint;
+  /** Maximum gas price in gwei the bot is willing to pay. 0 = no limit. */
+  maxGasPriceGwei?: bigint;
   now?: () => number;
   log?: (message: string) => void;
   /** Optional Flashbots relay URL for private bundle submission. */
@@ -99,6 +101,7 @@ interface RateWindow {
 
 export class Executor {
   private readonly windows = new Map<string, RateWindow>();
+  private readonly pendingRescues = new Set<string>();
   private readonly now: () => number;
   private readonly log: (message: string) => void;
 
@@ -129,8 +132,16 @@ export class Executor {
       return { status: "VARIANT_B_UNSUPPORTED", reason: message };
     }
 
+    if (this.pendingRescues.has(wallet.vaultAddress.toLowerCase())) {
+      const message = `[${wallet.label}] rescue already in flight for ${wallet.vaultAddress}; skipping duplicate.`;
+      this.log(message);
+      return { status: "SKIPPED", reason: message };
+    }
+
     const gate = await this.preflight(wallet, reason);
     if (gate !== null) return gate;
+
+    this.pendingRescues.add(wallet.vaultAddress.toLowerCase());
 
     // Partition the requested tokens by whether the vault can actually pull
     // them. See `partitionByAllowance` for why this is not an optimisation.
@@ -150,6 +161,7 @@ export class Executor {
       // Everything requested is unpullable. Broadcasting here would emit a
       // rescue transaction that provably moves nothing — burning gas and
       // logging "rescue sent" while the operator's funds stay put.
+      this.pendingRescues.delete(wallet.vaultAddress.toLowerCase());
       return { status: "SKIPPED", reason: strandedMessage(wallet, stranded) };
     }
 
@@ -162,6 +174,7 @@ export class Executor {
     for (const chunk of chunkTokens(watch.movable)) plans.push({ tokens: chunk, chargeFee: false });
 
     if (plans.length === 0) {
+      this.pendingRescues.delete(wallet.vaultAddress.toLowerCase());
       return { status: "SKIPPED", reason: "No tokens configured for this wallet." };
     }
 
@@ -173,6 +186,7 @@ export class Executor {
       for (const description of descriptions) {
         this.log(`[DRY-RUN] ${wallet.label} would send: ${description}`);
       }
+      this.pendingRescues.delete(wallet.vaultAddress.toLowerCase());
       return { status: "DRY_RUN", planned: descriptions };
     }
 
@@ -206,6 +220,7 @@ export class Executor {
       );
     }
 
+    this.pendingRescues.delete(wallet.vaultAddress.toLowerCase());
     this.mark(window(this.windows, wallet), reason);
     // The tokens are reported so the scanner can tell a consumed allowance
     // apart from a revoked one. A successful rescue spends the allowance down
@@ -363,6 +378,18 @@ export class Executor {
         `${this.options.minExecutorEth} wei floor. Rule ${reason.rule} fired.`;
       this.log(message);
       return { status: "SKIPPED", reason: message };
+    }
+
+    if (this.options.maxGasPriceGwei && this.options.maxGasPriceGwei > 0n) {
+      const fees = await this.signer.getFeeData();
+      const currentGwei = fees.maxFeePerGas ?? fees.gasPrice ?? 0n;
+      const limitWei = this.options.maxGasPriceGwei * 1_000_000_000n;
+      if (currentGwei > limitWei) {
+        const message =
+          `Refusing to rescue ${wallet.label}: gas price ${currentGwei} wei exceeds limit ${limitWei} wei. Rule ${reason.rule} fired.`;
+        this.log(message);
+        return { status: "SKIPPED", reason: message };
+      }
     }
 
     const rate = this.checkRate(wallet);
