@@ -68,7 +68,8 @@ export const VERIFIED_TOKENS: Record<number, VerifiedTokenList> = {
   // ------------------------------------------------------------------ Sepolia
   [sepolia.id]: list([
     ["0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14", { symbol: "WETH", name: "Wrapped Ether", decimals: 18 }],
-    ["0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238", { symbol: "USDC", name: "USD Coin", decimals: 6 }],
+    ["0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238", { symbol: "USDC", name: "USD Coin (bridged)", decimals: 6 }],
+    ["0xbe72E441BF55620febc26715db68d3494213D8Cb", { symbol: "USDC", name: "USD Coin (native)", decimals: 18 }],
   ]),
 };
 

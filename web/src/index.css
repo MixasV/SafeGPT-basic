@@ -7,16 +7,16 @@
  * `text-text-secondary` or `border-border` resolve to these exact values.
  */
 :root {
-  --bg-primary: #0a0e17;
-  --bg-secondary: #111827;
-  --bg-tertiary: #1a2332;
-  --accent: #3b82f6;
-  --accent-green: #10b981;
+  --bg-primary: #0c0f0e;
+  --bg-secondary: #101413;
+  --bg-tertiary: #1a2320;
+  --accent: #6fe3ae;
+  --accent-green: #6fe3ae;
   --accent-red: #ef4444;
   --accent-yellow: #f59e0b;
-  --text-primary: #f9fafb;
-  --text-secondary: #9ca3af;
-  --border: #1f2937;
+  --text-primary: #efbfc2;
+  --text-secondary: #839188;
+  --border: #2c3530;
 }
 
 @theme inline {
@@ -43,6 +43,10 @@ body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
   font-family:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+code, pre, .font-mono, [class*="font-mono"] {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }

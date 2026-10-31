@@ -88,27 +88,28 @@ async function readAssets(
   protectedWallet: `0x${string}`,
   assets: SelectedAsset[],
 ): Promise<AssetRow[]> {
-  return Promise.all(
+  const rows = await Promise.all(
     assets.map(async (asset) => {
       const address = asset.address as `0x${string}`;
-
-      // Symbol and decimals rarely change and are already known from the
-      // wizard, so a failure there must not sink the whole row.
-      const [balance, allowance, symbol, decimals] = await Promise.all([
-        client.readContract({ address, abi: erc20Abi, functionName: "balanceOf", args: [protectedWallet] }),
-        client.readContract({
-          address,
-          abi: erc20Abi,
-          functionName: "allowance",
-          args: [protectedWallet, vaultAddress],
-        }),
-        client.readContract({ address, abi: erc20Abi, functionName: "symbol" }).catch(() => asset.symbol),
-        client.readContract({ address, abi: erc20Abi, functionName: "decimals" }).catch(() => asset.decimals),
-      ]);
-
-      return { address, symbol, decimals, balance, allowance, verified: asset.verified };
+      try {
+        const [balance, allowance, symbol, decimals] = await Promise.all([
+          client.readContract({ address, abi: erc20Abi, functionName: "balanceOf", args: [protectedWallet] }),
+          client.readContract({
+            address,
+            abi: erc20Abi,
+            functionName: "allowance",
+            args: [protectedWallet, vaultAddress],
+          }),
+          client.readContract({ address, abi: erc20Abi, functionName: "symbol" }).catch(() => asset.symbol),
+          client.readContract({ address, abi: erc20Abi, functionName: "decimals" }).catch(() => asset.decimals),
+        ]);
+        return { address, symbol, decimals, balance, allowance, verified: asset.verified } as AssetRow;
+      } catch {
+        return null;
+      }
     }),
   );
+  return rows.filter((row): row is AssetRow => row !== null);
 }
 
 const DEMO_STATE: Omit<VaultState, "refresh"> = {

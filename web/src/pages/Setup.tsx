@@ -1,7 +1,7 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Address, Hex } from "viem";
-import { useAccount, usePublicClient, useWalletClient } from "wagmi";
+import { useAccount, useChainId, usePublicClient, useWalletClient } from "wagmi";
 
 import { StepApproveProtection } from "../components/onboarding/StepApproveProtection";
 import { StepConnectWallet } from "../components/onboarding/StepConnectWallet";
@@ -44,6 +44,7 @@ export function Setup() {
   const navigate = useNavigate();
   const mode = useMode();
   const { address, isConnected } = useAccount();
+  const walletChainId = useChainId();
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
 
@@ -55,6 +56,7 @@ export function Setup() {
     vaultAddress,
     assets,
     setStep,
+    setAssets,
     setChainId,
     setNativeBalance,
     complete,
@@ -86,6 +88,20 @@ export function Setup() {
   const approval = useApprovalFlow(walletClient, publicClient, vaultAddress as Address, assets);
 
   const activeIndex = Math.max(0, BEGINNER_STEPS.indexOf(step));
+
+  /**
+   * Keep the onboarding chain in sync with the connected wallet. Without this
+   * the store defaulted to mainnet (1) and the token scan read mainnet contracts
+   * even when the wallet was on Sepolia — so a Sepolia WETH balance was never
+   * found because the scan asked the mainnet WETH contract, which the wallet
+   * does not hold. wagmi is the source of truth for the active network.
+   */
+  useEffect(() => {
+    if (!DEMO_MODE && isConnected && walletChainId && walletChainId !== chainId) {
+      setAssets([]);
+      setChainId(walletChainId);
+    }
+  }, [isConnected, walletChainId, chainId, setChainId, setAssets]);
 
   const refreshNativeBalance = useCallback(async () => {
     if (!publicClient || !account) {

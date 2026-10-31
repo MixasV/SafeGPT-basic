@@ -25,6 +25,7 @@ export type AnalyticsEvent =
   | "onboarding_started"
   | "drainer_check_passed"
   | "drainer_check_failed"
+  | "drainer_check_skipped"
   | "onboarding_completed"
   | "ai_assistant_request"
   | "ai_explanation_requested"
@@ -54,6 +55,8 @@ export interface AnalyticsData {
   errorKind?: string;
   step?: string;
   stepCount?: number;
+  reason?: string;
+  balanceWei?: string;
 }
 
 const ENDPOINT = import.meta.env.VITE_ANALYTICS_URL as string | undefined;
@@ -101,6 +104,7 @@ export const ANALYTICS_EVENTS: readonly AnalyticsEvent[] = [
   "onboarding_started",
   "drainer_check_passed",
   "drainer_check_failed",
+  "drainer_check_skipped",
   "onboarding_completed",
   "ai_assistant_request",
   "ai_explanation_requested",

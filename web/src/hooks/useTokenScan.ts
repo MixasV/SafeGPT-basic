@@ -34,13 +34,6 @@ const ALCHEMY_NETWORKS: Record<number, string> = {
   42161: "arb-mainnet",
 };
 
-const EXPLORER_APIS: Record<number, string> = {
-  1: "https://api.etherscan.io/api",
-  11155111: "https://api-sepolia.etherscan.io/api",
-  8453: "https://api.basescan.org/api",
-  42161: "https://api.arbiscan.io/api",
-};
-
 const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY as string | undefined;
 const EXPLORER_API_KEY = import.meta.env.VITE_EXPLORER_API_KEY as string | undefined;
 
@@ -51,10 +44,33 @@ const CHAIN_BY_ID: Record<number, Chain> = {
   [arbitrum.id]: arbitrum,
 };
 
+/**
+ * Public RPC endpoints that permit browser CORS. These are free, require no
+ * API key, and work from a browser page — unlike most free endpoints which
+ * block cross-origin requests. When VITE_RPC_URL_<chainId> is set it takes
+ * precedence, so a self-hosted instance can point at its own node.
+ */
+const DEFAULT_RPC_URLS: Record<number, string> = {
+  [mainnet.id]: "https://ethereum.publicnode.com",
+  [sepolia.id]: "https://ethereum-sepolia.publicnode.com",
+  [base.id]: "https://mainnet.base.org",
+  [arbitrum.id]: "https://arb1.arbitrum.io/rpc",
+};
+
+function rpcUrl(chainId: number): string {
+  const override = import.meta.env[`VITE_RPC_URL_${chainId}`] as string | undefined;
+  if (override) return override;
+  const fallback = DEFAULT_RPC_URLS[chainId];
+  if (!fallback) {
+    throw new Error(`No RPC endpoint configured for chain ${chainId}. Set VITE_RPC_URL_${chainId}.`);
+  }
+  return fallback;
+}
+
 /** Standalone client so the hook works outside the wagmi React context. */
 function publicClientFor(chainId: number): PublicClient {
   const chain = CHAIN_BY_ID[chainId] ?? mainnet;
-  return createPublicClient({ chain, transport: http() });
+  return createPublicClient({ chain, transport: http(rpcUrl(chainId), { timeout: 8_000 }) });
 }
 
 /** Level 1 — indexer API (Alchemy). Fast and complete when a key is configured. */
@@ -62,42 +78,61 @@ async function scanViaIndexer(owner: Address, chainId: number): Promise<ScanResu
   const network = ALCHEMY_NETWORKS[chainId];
   if (!network || !ALCHEMY_API_KEY) return null;
 
-  const balancesResponse = await fetch(
-    `https://${network}.g.alchemy.com/v2/${ALCHEMY_API_KEY}/getTokenBalances`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify([owner, "erc20"]),
-    },
-  );
+  const rpcUrl = `https://${network}.g.alchemy.com/v2/${ALCHEMY_API_KEY}`;
+
+  const balancesResponse = await fetch(rpcUrl, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "alchemy_getTokenBalances",
+      params: [owner, "erc20"],
+    }),
+  });
   if (!balancesResponse.ok) return null;
 
-  const balances = (await balancesResponse.json()) as {
-    tokenBalances?: { contractAddress: string; tokenBalance: string | null }[];
+  const balancesPayload = (await balancesResponse.json()) as {
+    result?: { tokenBalances?: { contractAddress: string; tokenBalance: string | null }[] };
+    error?: { message?: string };
   };
-  const addresses = (balances.tokenBalances ?? [])
+  if (balancesPayload.error) return null;
+
+  const tokenBalances = balancesPayload.result?.tokenBalances ?? [];
+  const addresses = tokenBalances
     .filter((entry) => entry.tokenBalance !== null && BigInt(entry.tokenBalance) > 0n)
     .map((entry) => entry.contractAddress);
 
   if (addresses.length === 0) return { source: "alchemy", tokens: [] };
 
-  const metadataResponse = await fetch(
-    `https://${network}.g.alchemy.com/v2/${ALCHEMY_API_KEY}/getTokenMetadata`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(addresses),
-    },
-  );
-  if (!metadataResponse.ok) return null;
-
-  const metadata = (await metadataResponse.json()) as Record<
-    string,
-    { name?: string; symbol?: string; decimals?: number }
-  >;
   const rawBalances = new Map(
-    (balances.tokenBalances ?? []).map((entry) => [entry.contractAddress.toLowerCase(), entry.tokenBalance ?? "0"]),
+    tokenBalances.map((entry) => [entry.contractAddress.toLowerCase(), entry.tokenBalance ?? "0"]),
   );
+
+  const metadataEntries = await Promise.all(
+    addresses.map(async (address) => {
+      try {
+        const response = await fetch(rpcUrl, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "alchemy_getTokenMetadata",
+            params: [address],
+          }),
+        });
+        if (!response.ok) return [address, {}] as const;
+        const payload = (await response.json()) as {
+          result?: { name?: string; symbol?: string; decimals?: number };
+        };
+        return [address, payload.result ?? {}] as const;
+      } catch {
+        return [address, {}] as const;
+      }
+    }),
+  );
+  const metadata = Object.fromEntries(metadataEntries.map(([address, info]) => [address.toLowerCase(), info]));
 
   const tokens: ScannedToken[] = [];
   for (const address of addresses) {
@@ -105,7 +140,7 @@ async function scanViaIndexer(owner: Address, chainId: number): Promise<ScanResu
     tokens.push({
       address: address as Address,
       symbol: info.symbol ?? "UNKNOWN",
-      decimals: info.decimals ?? 18,
+      decimals: typeof info.decimals === "number" ? info.decimals : 18,
       balance: BigInt(rawBalances.get(address.toLowerCase()) ?? "0"),
     });
   }
@@ -114,10 +149,10 @@ async function scanViaIndexer(owner: Address, chainId: number): Promise<ScanResu
 
 /** Level 2 — block explorer transfer history, unique contracts + on-chain balances. */
 async function scanViaPublicAPI(owner: Address, chainId: number, client: PublicClient): Promise<ScanResult | null> {
-  const endpoint = EXPLORER_APIS[chainId];
-  if (!endpoint || !EXPLORER_API_KEY) return null;
+  if (!EXPLORER_API_KEY) return null;
 
-  const url = new URL(endpoint);
+  const url = new URL("https://api.etherscan.io/v2/api");
+  url.searchParams.set("chainid", String(chainId));
   url.searchParams.set("module", "account");
   url.searchParams.set("action", "tokentx");
   url.searchParams.set("address", owner);
@@ -129,9 +164,11 @@ async function scanViaPublicAPI(owner: Address, chainId: number, client: PublicC
   const response = await fetch(url);
   if (!response.ok) return null;
 
-  const payload = (await response.json()) as { result?: { contractAddress?: string }[] };
+  const payload = (await response.json()) as { status?: string; message?: string; result?: { contractAddress?: string }[] };
+  if (!Array.isArray(payload.result)) return null;
+
   const seen = new Map<string, TokenInfo>();
-  for (const entry of payload.result ?? []) {
+  for (const entry of payload.result) {
     const contract = entry.contractAddress;
     if (!contract || seen.has(contract.toLowerCase())) continue;
     const info = await readTokenMetadata(client, contract as Address);
@@ -160,22 +197,44 @@ async function scanFromDefaultList(
 ): Promise<ScanResult> {
   const { DEFAULT_TOKENS } = await import("../config/tokens");
   const candidates = DEFAULT_TOKENS[chainId] ?? [];
-  const tokens: ScannedToken[] = [];
 
-  for (const info of candidates) {
-    try {
-      const balance = await client.readContract({
-        address: info.address,
-        abi: erc20Abi,
-        functionName: "balanceOf",
-        args: [owner],
-      });
-      if (balance > 0n) tokens.push({ ...info, balance });
-    } catch {
-      // A token that cannot be read is simply not shown; it may still be protectable manually.
+  // Read every token balance in parallel with a small concurrency cap so a
+  // slow RPC cannot stall the whole scan on a single sequential call.
+  const CONCURRENCY = 6;
+  const results: ScannedToken[] = [];
+  for (let i = 0; i < candidates.length; i += CONCURRENCY) {
+    const batch = candidates.slice(i, i + CONCURRENCY);
+    const settled = await Promise.allSettled(
+      batch.map(async (info) => {
+        const [balance, decimals] = await Promise.all([
+          client.readContract({
+            address: info.address,
+            abi: erc20Abi,
+            functionName: "balanceOf",
+            args: [owner],
+          }),
+          client.readContract({
+            address: info.address,
+            abi: erc20Abi,
+            functionName: "decimals",
+          }).catch(() => info.decimals),
+        ]);
+        return { info, balance, decimals };
+      }),
+    );
+    for (const entry of settled) {
+      if (entry.status === "fulfilled" && entry.value.balance > 0n) {
+        results.push({
+          ...entry.value.info,
+          decimals: typeof entry.value.decimals === "number"
+            ? entry.value.decimals
+            : (typeof entry.value.decimals === "bigint" ? Number(entry.value.decimals) : entry.value.info.decimals),
+          balance: entry.value.balance,
+        });
+      }
     }
   }
-  return { source: "bundled", tokens };
+  return { source: "bundled", tokens: results };
 }
 
 async function readTokenMetadata(client: PublicClient, address: Address): Promise<TokenInfo> {
@@ -186,7 +245,7 @@ async function readTokenMetadata(client: PublicClient, address: Address): Promis
   return {
     address,
     symbol: typeof symbol === "string" && symbol.length > 0 ? symbol : "UNKNOWN",
-    decimals: typeof decimals === "number" ? decimals : 18,
+    decimals: typeof decimals === "number" ? decimals : (typeof decimals === "bigint" ? Number(decimals) : 18),
   };
 }
 

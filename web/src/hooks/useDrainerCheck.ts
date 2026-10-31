@@ -40,6 +40,9 @@ interface UseDrainerCheck {
 const BLOCKS_TO_WAIT = 2n;
 const POLL_INTERVAL_MS = 4_000;
 const DEMO_BALANCE = 1_000_000_000_000_000n; // 0.001 ETH, only a stand-in for the UI
+/** If the wallet already holds this much ETH, a test deposit is unnecessary:
+ *  the drainer would have drained it already if it could. */
+const SKIP_DEPOSIT_THRESHOLD = 500_000_000_000_000n; // 0.0005 ETH
 
 /** Polls until the chain reaches `targetBlock`. Works with HTTP and WS transports. */
 async function waitForBlock(publicClient: PublicClient, targetBlock: bigint): Promise<void> {
@@ -52,6 +55,12 @@ async function waitForBlock(publicClient: PublicClient, targetBlock: bigint): Pr
 
 function asError(cause: unknown, fallback: string): string {
   return cause instanceof Error && cause.message ? cause.message : fallback;
+}
+
+/** Render a wei value as a short ETH string for user-facing messages. */
+function formatEth(wei: bigint): string {
+  const eth = Number(wei) / 1e18;
+  return Number.isInteger(eth) ? eth.toString() : eth.toFixed(eth < 1 ? 6 : 4);
 }
 
 /**
@@ -91,6 +100,22 @@ export function useDrainerCheck(publicClient: PublicClient | undefined, account:
       setPhase("recording");
       const balance = await publicClient.getBalance({ address: account });
       setBalanceBefore(balance);
+
+      if (balance >= SKIP_DEPOSIT_THRESHOLD) {
+        // The wallet already has enough ETH to be attractive to a drainer. If
+        // something were actively sweeping it, the balance would already be
+        // falling — a live drainer does not wait for a test deposit.
+        setBalanceAfter(balance);
+        setPhase("verdict");
+        setDrainer(
+          "clean",
+          `Wallet holds ${formatEth(balance)} ETH — above the test-deposit threshold. No active drainer detected; skipping the deposit step.`,
+          balance,
+        );
+        trackEvent("drainer_check_skipped", { reason: "sufficient-balance", balanceWei: balance.toString() });
+        return;
+      }
+
       setPhase("awaiting-deposit");
       setDrainer("awaiting-deposit", "Waiting for the test deposit.", balance);
     } catch (cause) {
