@@ -14,6 +14,7 @@ import { StepDrainerCheck } from "../components/onboarding/StepDrainerCheck";
 import { StepAlerts, StepRules, StepWhitelist } from "../components/onboarding/StepProConfig";
 import { StepProtectionActive } from "../components/onboarding/StepProtectionActive";
 import { StepSafeAddress } from "../components/onboarding/StepSafeAddress";
+import { StepExecutorAddress } from "../components/onboarding/StepExecutorAddress";
 import { StepSelectAssets } from "../components/onboarding/StepSelectAssets";
 import { PreDeployReview } from "../components/onboarding/PreDeployReview";
 import { WizardShell } from "../components/onboarding/WizardShell";
@@ -33,6 +34,7 @@ const STEP_META: Record<WizardStepId, { title: string; description: string }> = 
   drainer: { title: "Safety check", description: "Detect an active sweeper" },
   chaingpt: { title: "ChainGPT AI", description: "Optional AI setup" },
   "safe-address": { title: "Safe address", description: "Where funds are rescued to" },
+  executor: { title: "Executor (bot)", description: "Bot wallet that pays gas" },
   assets: { title: "Select assets", description: "Scan ERC-20 balances" },
   "pre-deploy": { title: "Pre-deploy review", description: "AI config review" },
   deploy: { title: "Deploy protection", description: "Create the vault contract" },
@@ -290,7 +292,11 @@ export function Setup() {
               goTo(activeIndex + 1);
             }}
           />
-        );
+
+      );
+
+      case "executor":
+        return <StepExecutorAddress onBack={() => goTo(activeIndex - 1)} onContinue={() => goTo(activeIndex + 1)} />;
 
       case "assets":
         return (
@@ -411,39 +417,7 @@ export function Setup() {
         </button>
       </div>
 
-      {resolvedExecutor === "0x0000000000000000000000000000000000000000" && (
-        <div className="mb-4 rounded-lg border border-border bg-bg-tertiary p-4">
-          <p className="text-sm font-medium text-text-primary">Executor (bot) address</p>
-          <p className="mt-1 text-xs text-text-secondary">
-            Run <code className="rounded bg-bg-secondary px-1">npx safegpt-bot init</code> to create an executor wallet,
-            then paste its address here. Or run{" "}
-            <code className="rounded bg-bg-secondary px-1">safegpt-bot-init.bat</code> from the project root (safegpt-core).
-          </p>
-          <div className="mt-2 flex gap-2">
-            <button
-              type="button"
-              onClick={() => navigator.clipboard.writeText("npx safegpt-bot init")}
-              className="rounded-lg border border-border px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary"
-            >
-              Copy command
-            </button>
-          </div>
-          <input
-            value={executor}
-            onChange={(e) => setExecutor(e.target.value as Address)}
-            placeholder="0x..."
-            className="mt-2 w-full rounded-lg border border-border bg-bg-primary px-3 py-2 font-mono text-sm text-text-primary"
-          />
-          {executor !== "0x0000000000000000000000000000000000000000" &&
-            (executor.toLowerCase() === account?.toLowerCase() || executor.toLowerCase() === safeAddress.toLowerCase()) && (
-              <p className="mt-1 text-xs text-accent-red">Executor must differ from protected wallet and safe address.</p>
-            )}
-        </div>
-      )}
-
-      <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
-        <div>
-          <WizardShell steps={steps} activeIndex={activeIndex} onNavigate={goTo}>
+      <WizardShell steps={steps} activeIndex={activeIndex} onNavigate={goTo}>
             {renderStep()}
           </WizardShell>
 
@@ -466,10 +440,9 @@ export function Setup() {
           Restart onboarding
         </button>
       </div>
-        </div>
-        <aside className="hidden lg:block sticky top-24 self-start">
-          <AskAI />
-        </aside>
+
+      <div className="mt-6">
+        <AskAI />
       </div>
     </div>
   );

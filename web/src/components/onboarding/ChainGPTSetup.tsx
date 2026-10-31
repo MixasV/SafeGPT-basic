@@ -4,8 +4,19 @@ import { PrimaryButton, SecondaryButton } from "./StepFrame";
 import { chaingpt } from "../../services/chaingpt/client";
 
 export function ChainGPTSetup({ onContinue }: { onContinue?: () => void }) {
+  const hasKey = !!localStorage.getItem("chaingpt_api_key");
   const [key, setKey] = useState("");
   const [status, setStatus] = useState("");
+
+  if (hasKey) {
+    return (
+      <div className="rounded-2xl border border-border bg-surface p-4 space-y-3">
+        <h3 className="text-sm font-semibold text-text-primary">Step 3: AI Security Advisor (optional)</h3>
+        <p className="text-xs text-text-secondary">✅ Connected — ChainGPT AI is configured.</p>
+        <PrimaryButton onClick={() => onContinue?.()}>Continue</PrimaryButton>
+      </div>
+    );
+  }
 
   function save() {
     if (!key.trim()) return;

@@ -13,6 +13,7 @@ export type WizardStepId =
   | "drainer"
   | "chaingpt"
   | "safe-address"
+  | "executor"
   | "assets"
   | "pre-deploy"
   | "deploy"
@@ -30,6 +31,7 @@ export const BEGINNER_STEPS: readonly WizardStepId[] = [
   "drainer",
   "chaingpt",
   "safe-address",
+  "executor",
   "assets",
   "pre-deploy",
   "deploy",
@@ -81,6 +83,7 @@ interface OnboardingState {
   step: WizardStepId;
   walletAddress: string;
   safeAddress: string;
+  executor: string;
   /** Safe address linked to the platform account by a signature (UPD-3, Sprint 7). */
   safeAddressLinked: boolean;
   vaultAddress: string;
@@ -102,6 +105,7 @@ interface OnboardingState {
   setStep: (step: WizardStepId) => void;
   setWalletAddress: (address: string) => void;
   setSafeAddress: (address: string) => void;
+  setExecutor: (address: string) => void;
   setSafeAddressLinked: (linked: boolean) => void;
   setVaultAddress: (address: string) => void;
   setFactoryAddress: (address: string) => void;
@@ -125,6 +129,7 @@ const INITIAL = {
   step: "how-it-works" as WizardStepId,
   walletAddress: "",
   safeAddress: "",
+  executor: "0x0000000000000000000000000000000000000000",
   safeAddressLinked: false,
   vaultAddress: "",
   factoryAddress: "",
@@ -160,6 +165,7 @@ export const useOnboardingStore = create<OnboardingState>()(
       setStep: (step) => set({ step }),
       setWalletAddress: (walletAddress) => set({ walletAddress }),
       setSafeAddress: (safeAddress) => set({ safeAddress }),
+      setExecutor: (executor) => set({ executor }),
       setSafeAddressLinked: (safeAddressLinked) => set({ safeAddressLinked }),
       setVaultAddress: (vaultAddress) => set({ vaultAddress }),
       setFactoryAddress: (factoryAddress) => set({ factoryAddress }),
