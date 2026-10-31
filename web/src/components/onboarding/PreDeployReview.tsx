@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { chaingpt } from "../../services/chaingpt/client";
+import { buildPreDeployReviewPrompt } from "../../features/onboarding/buildPreDeployReviewPrompt";
 import rescueVaultSource from "../../../../contracts/src/RescueVault.sol?raw";
 import { MarkdownRenderer } from "../dashboard/MarkdownRenderer";
 import { ProtectionScore, calculateProtectionScore } from "./ProtectionScore";
@@ -8,9 +9,6 @@ import { useOnboardingStore } from "../../state/onboarding";
 
 export function PreDeployReview({ onContinue }: { onContinue?: () => void }) {
   const assets = useOnboardingStore((s) => s.assets);
-  const safeAddress = useOnboardingStore((s) => s.safeAddress);
-  const chainId = useOnboardingStore((s) => s.chainId);
-  const vaultAddress = useOnboardingStore((s) => s.vaultAddress);
   const [loading, setLoading] = useState(false);
   const [auditLoading, setAuditLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -31,8 +29,8 @@ export function PreDeployReview({ onContinue }: { onContinue?: () => void }) {
   async function runReview() {
     setLoading(true);
     
-    const configJson = JSON.stringify({ chainId, safeAddress, vaultAddress, assets });
-    const r = await chaingpt.reviewConfiguration(configJson);
+    const fullPrompt = buildPreDeployReviewPrompt();
+    const r = await chaingpt.reviewSecurity(fullPrompt);
     setResult(r.data.markdown);
     
     setAiDone(true);

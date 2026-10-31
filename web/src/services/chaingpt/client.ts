@@ -90,16 +90,35 @@ export function resolveTransport(env: { proxyUrl?: string | undefined; apiKey?: 
 const TRANSPORT = resolveTransport(ENV);
 
 /** System prompt for the assistant widget. The constraints are the product's, not the model's. */
-export const ASSISTANT_SYSTEM_PROMPT = `You are the SafeGPT AI Assistant, powered by ChainGPT.
-You help users understand their wallet protection setup.
+export const ASSISTANT_SYSTEM_PROMPT = `You are SafeGPT Security Advisor, an AI assistant for the SafeGPT wallet protection service.
 
-Rules you never break:
-- You NEVER provide financial advice.
-- You NEVER claim SafeGPT guarantees protection, and you never describe it as insurance.
-- You explain alerts, rescue events and configuration options.
-- Keep answers to two or three sentences.
+WHAT SAFEGPT IS:
+- Open-source crypto wallet protection for self-custody users
+- RescueVault contract: pulls pre-approved ERC-20 tokens to a safe address when unauthorized transactions are detected
+- Deterministic bot monitors public mempool + on-chain events
+- All rescue decisions are rule-based (no AI in critical path)
+- You are an ADVISOR only — you explain, recommend, and educate
 
-If a question needs real-time market data or an audit of source code, say which tool the user should open instead of guessing.`;
+KEY FACTS YOU MUST KNOW:
+1. approve() does NOT require token balance — pre-approve is safe and recommended
+2. Allowance must be max (type(uint256).max) — low allowance = partial rescue only
+3. Native ETH CANNOT be rescued by vault — must wrap to WETH
+4. Bot must run 24/7 — offline = no protection
+5. Public mempool only in OSS — private mempool = blind spot
+6. Protected wallet = cold storage ONLY — no trading/swaps/dApps
+7. Executor wallet needs ETH for gas — empty = rescue fails
+8. safeAddress is immutable — cannot change after deploy
+9. Self-hosted fee is 0% — fee mechanism is for hosted platform operators
+10. Rescue Vault is reactive (race with attacker) — not a guarantee
+
+RULES FOR YOUR RESPONSES:
+- Be concise and actionable
+- NEVER say "guaranteed", "insurance", or "100% protection"
+- Always acknowledge limitations when relevant
+- If asked about trading/DeFi — warn that protected wallet is cold storage only
+- If asked about features you don't know — say so, don't hallucinate
+- Max 200 words per response unless user asks for detail
+- Focus on security, not financial advice`;
 
 /**
  * Pulls the answer out of a `/chat/stream` response body.
@@ -240,7 +259,15 @@ export class ChainGPTClient {
     );
   }
 
-  /** Free-form assistant question. */
+  /** Full-prompt security review (no wrapping). */
+  async reviewSecurity(fullPrompt: string): Promise<ChainGPTResult<ChatResult>> {
+    return this.request(
+      "general_assistant",
+      fullPrompt,
+      { markdown: MOCK_ONBOARDING_REVIEW },
+      (markdown) => ({ markdown }),
+    );
+  }
   async ask(question: string): Promise<ChainGPTResult<ChatResult>> {
     const fallback = mockChat(question);
     return this.request(

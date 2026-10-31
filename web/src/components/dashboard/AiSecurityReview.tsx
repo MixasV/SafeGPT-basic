@@ -1,13 +1,10 @@
 import { useState } from "react";
 
 import { chaingpt } from "../../services/chaingpt/client";
+import { buildSecurityConfigData } from "../../features/dashboard/buildSecurityConfigData";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 
-import { buildSecurityReviewPrompt } from "../../features/dashboard/buildSecurityReviewPrompt";
-
-type Props = Record<string, never>;
-
-export function AiSecurityReview(_props: Props) {
+export function AiSecurityReview(_props: Record<string, never>) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
@@ -15,8 +12,8 @@ export function AiSecurityReview(_props: Props) {
   async function run() {
     setLoading(true);
     setWarning(null);
-    const prompt = buildSecurityReviewPrompt();
-    const r = await chaingpt.reviewConfiguration(prompt);
+    const configData = buildSecurityConfigData();
+    const r = await chaingpt.reviewConfiguration(configData);
     setResult(r.data.markdown);
     setWarning(r.warning ?? null);
     setLoading(false);
