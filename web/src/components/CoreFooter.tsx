@@ -56,9 +56,8 @@ export function CoreFooter() {
           <p className="mt-2 text-xs text-text-secondary">
             Powered by{" "}
             <a href="https://chaingpt.org" target="_blank" rel="noreferrer" className="text-accent underline">
-              ChainGPT AI
-            </a>{" "}
-            — https://chaingpt.org
+              ChainGPT AI — https://chaingpt.org
+            </a>
           </p>
         )}
       </div>

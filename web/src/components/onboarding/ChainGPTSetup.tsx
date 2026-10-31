@@ -54,7 +54,10 @@ export function ChainGPTSetup({ onContinue }: { onContinue?: () => void }) {
         2. Connect wallet or create account 3. API Dashboard → Create API Key 4. Copy key and paste below
       </p>
       <p className="text-xs text-text-secondary">
-        Cost: ~$0.005 per AI check (~$0.03-0.05 total for setup). Powered by ChainGPT AI — https://chaingpt.org
+        Cost: ~$0.005 per AI check (~$0.03-0.05 total for setup). Powered by{" "}
+        <a href="https://chaingpt.org" target="_blank" rel="noreferrer" className="text-accent underline">
+          ChainGPT AI — https://chaingpt.org
+        </a>
       </p>
 
       <input
