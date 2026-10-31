@@ -336,6 +336,12 @@ export function Setup() {
         </p>
       )}
 
+      {chainId !== 1 && chainId !== 8453 && chainId !== 42161 && (
+        <p className="mb-4 rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-600">
+          Testnet mode — no real assets. Use for testing only.
+        </p>
+      )}
+
       <WizardShell steps={steps} activeIndex={activeIndex} onNavigate={goTo}>
         {renderStep()}
       </WizardShell>
