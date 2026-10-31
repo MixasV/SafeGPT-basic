@@ -3,6 +3,7 @@ import { formatUnits, isAddress, maxUint256, parseUnits, type Address } from "vi
 
 import { DEMO_MODE } from "../../config/demo";
 import { getWethAddress } from "../../config/contracts";
+import { VERIFIED_TOKENS } from "../../config/verified-tokens";
 import { chainName } from "../../config/tokens";
 import { useMode } from "../../hooks/useMode";
 import { buildApproveCalldata, useTokenScan, validateManualToken } from "../../hooks/useTokenScan";
@@ -171,6 +172,31 @@ export function StepSelectAssets({
               </div>
             );
           })()}
+
+          <div className="flex items-center gap-2">
+            <select
+              onChange={(e) => {
+                const addr = e.target.value;
+                if (!addr) return;
+                const info = Object.entries(VERIFIED_TOKENS[chainId] ?? {}).find(([a]) => a.toLowerCase() === addr.toLowerCase())?.[1];
+                if (info) {
+                  addManualAsset({ address: addr, symbol: info.symbol, decimals: info.decimals, balance: "0", verified: true, selected: false });
+                }
+                e.target.value = "";
+              }}
+              className="rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-sm text-text-primary"
+            >
+              <option value="">+ Add verified token</option>
+              {Object.entries(VERIFIED_TOKENS[chainId] ?? {}).map(([addr, info]) => {
+                if (assets.some((a) => a.address.toLowerCase() === addr.toLowerCase())) return null;
+                return (
+                  <option key={addr} value={addr}>
+                    {info.symbol}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
 
           <ul className="space-y-2">
             {assets.map((asset) => (

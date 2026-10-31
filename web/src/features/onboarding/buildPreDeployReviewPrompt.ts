@@ -1,7 +1,7 @@
 import { useOnboardingStore } from "../../state/onboarding";
 import type { SelectedAsset } from "../../state/onboarding";
 
-export function buildPreDeployReviewPrompt(): string {
+export function buildPreDeployReviewPrompt(safeBalance: string = "0"): string {
   const state = useOnboardingStore.getState();
   const selected = state.assets.filter((a: SelectedAsset) => a.selected);
   const totalUSD = selected.length * 1000; // placeholder
@@ -14,7 +14,7 @@ export function buildPreDeployReviewPrompt(): string {
 CONFIGURATION TO DEPLOY:
 - Chain ID: ${state.chainId}
 - Protected wallet: ${state.walletAddress || "unknown"}
-- Safe address: ${state.safeAddress || "NOT SET"} (balance: 0 ETH)
+- Safe address: ${state.safeAddress || "NOT SET"} (balance: ${safeBalance} ETH)
 - Executor (bot): not set
 - Fee: 0%
 

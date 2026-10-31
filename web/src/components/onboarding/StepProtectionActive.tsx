@@ -11,6 +11,7 @@ interface StepProtectionActiveProps {
   account: Address;
   vaultAddress: Address;
   safeAddress: string;
+  executorAddress?: string;
   assets: SelectedAsset[];
 }
 
@@ -21,6 +22,7 @@ export function StepProtectionActive({
   account,
   vaultAddress,
   safeAddress,
+  executorAddress,
   assets,
 }: StepProtectionActiveProps) {
   const protectedAssets = assets.filter((asset) => asset.selected);
@@ -96,16 +98,11 @@ export function StepProtectionActive({
         </div>
       </dl>
 
-      <ul className="flex flex-wrap gap-2">
-        {protectedAssets.map((asset) => (
-          <li
-            key={asset.address}
-            className="rounded-full border border-border bg-bg-tertiary px-3 py-1 text-xs text-text-primary"
-          >
-            {asset.symbol}
-          </li>
-        ))}
-      </ul>
+      <div className="rounded-lg border border-border bg-bg-tertiary p-4 text-sm text-text-secondary">
+        <p className="font-medium text-text-primary">Executor wallet (bot)</p>
+        <p>Run <code>npx safegpt-bot init</code> to create an executor wallet, then send 0.02-0.05 ETH to it for gas.</p>
+        {executorAddress && <p className="mt-1 font-mono text-xs">Executor: {executorAddress}</p>}
+      </div>
     </StepFrame>
   );
 }

@@ -344,6 +344,7 @@ export function Setup() {
             chainId={chainId}
             vaultAddress={vaultAddress as Address}
             safeAddress={safeAddress}
+            executorAddress={resolvedExecutor}
             assets={assets}
             onFinish={() => {
               complete();
