@@ -241,7 +241,7 @@ export class ChainGPTClient {
     }
   }
 
-  // ── Chatbot ────────────────────────────────────────────────────────────
+  // --- Chatbot ---
 
   /** Configuration review shown on the final wizard screen. */
   async reviewConfiguration(configJson: string): Promise<ChainGPTResult<ChatResult>> {
@@ -299,7 +299,7 @@ export class ChainGPTClient {
     );
   }
 
-  // ── Auditor ────────────────────────────────────────────────────────────
+  // --- Auditor ---
 
   /**
    * Audits Solidity SOURCE.
@@ -319,7 +319,7 @@ export class ChainGPTClient {
     );
   }
 
-  // ── Generator ──────────────────────────────────────────────────────────
+  // --- Generator ---
 
   async generate(description: string): Promise<ChainGPTResult<GenerateResult>> {
     return this.request(

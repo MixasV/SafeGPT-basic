@@ -68,7 +68,7 @@ export function StepDeployProtection({
   return (
     <StepFrame
       title="Deploy your protection contract"
-      subtitle="One-time setup. You pay a small gas fee; on Ethereum roughly $5вЂ“15, on L2 under $0.50."
+      subtitle="One-time setup. You pay a small gas fee; on Ethereum roughly $5–15, on L2 under $0.50."
       error={error}
       footer={
         <>

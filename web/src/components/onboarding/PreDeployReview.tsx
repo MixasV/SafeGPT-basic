@@ -87,7 +87,7 @@ export function PreDeployReview({ onContinue }: { onContinue?: () => void }) {
         </div>
       )}
       <div className="space-y-2">
-        <p className="text-sm font-medium text-text-primary">── Contract Audit ──</p>
+        <p className="text-sm font-medium text-text-primary">--- Contract Audit ---</p>
         <PrimaryButton onClick={runAudit} disabled={auditLoading}>
           {auditLoading ? "Auditing..." : "🔍 Audit RescueVault contract"}
         </PrimaryButton>

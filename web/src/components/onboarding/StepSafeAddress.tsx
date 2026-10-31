@@ -185,10 +185,10 @@ const continueDisabled = !validation.ok || (isPro && !linkedCurrent);
       </label>
 
       {stored !== "" && !validation.ok && <p className="text-sm text-accent-red">{validation.reason}</p>}
-      {validation.ok && <p className="text-sm text-accent-green">вњ“ Valid address</p>}
+      {validation.ok && <p className="text-sm text-accent-green">✓ Valid address</p>}
       {validation.ok && safeIsContract !== null && (
         <p className="text-sm text-text-secondary">
-          {safeIsContract ? "вљ пёЏ This appears to be a smart contract, not a regular wallet." : "✅ Valid EOA address"} — Balance: {safeBalance} ETH
+          {safeIsContract ? "⚠️ This appears to be a smart contract, not a regular wallet." : "✅ Valid EOA address"} — Balance: {safeBalance} ETH
         </p>
       )}
       {chainId === 1 && (
