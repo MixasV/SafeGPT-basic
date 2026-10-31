@@ -416,7 +416,7 @@ export function Setup() {
           <p className="mt-1 text-xs text-text-secondary">
             Run <code className="rounded bg-bg-secondary px-1">npx safegpt-bot init</code> to create an executor wallet,
             then paste its address here. Or run{" "}
-            <code className="rounded bg-bg-secondary px-1">safegpt-bot-init.bat</code> from the project root.
+            <code className="rounded bg-bg-secondary px-1">safegpt-bot-init.bat</code> from the project root (safegpt-core).
           </p>
           <div className="mt-2 flex gap-2">
             <button

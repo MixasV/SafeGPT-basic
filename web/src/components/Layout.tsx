@@ -21,6 +21,8 @@ import { useOnboardingStore } from "../state/onboarding";
 const APP_NAV = [
   { to: "/setup", label: "Setup" },
   { to: "/dashboard", label: "Dashboard" },
+  { to: "/auditor", label: "Auditor" },
+  { to: "/creator", label: "Creator" },
   { to: "/settings", label: "Settings" },
 ] as const;
 
