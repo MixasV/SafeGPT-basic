@@ -5,6 +5,7 @@ import { useAccount, useChainId, usePublicClient, useWalletClient } from "wagmi"
 
 import { StepApproveProtection } from "../components/onboarding/StepApproveProtection";
 import { StepConnectWallet } from "../components/onboarding/StepConnectWallet";
+import { AskAI } from "../features/dashboard/AskAI";
 import { StepHowItWorks } from "../components/onboarding/StepHowItWorks";
 import { StepQuiz } from "../components/onboarding/StepQuiz";
 import { ChainGPTSetup } from "../components/onboarding/ChainGPTSetup";
@@ -443,6 +444,10 @@ export function Setup() {
       <WizardShell steps={steps} activeIndex={activeIndex} onNavigate={goTo}>
         {renderStep()}
       </WizardShell>
+
+      <div className="mt-6">
+        <AskAI />
+      </div>
 
       <div className="mt-8 flex justify-end">
         <button

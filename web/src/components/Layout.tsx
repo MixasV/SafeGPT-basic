@@ -3,7 +3,6 @@ import { ConnectButton } from "@rainbow-me/rainbowkit";
 
 import { CoreFooter } from "./CoreFooter";
 import { DEMO_MODE } from "../config/demo";
-import { useOnboardingStore } from "../state/onboarding";
 
 /**
  * Core application shell.
@@ -36,8 +35,7 @@ function navLinkClass({ isActive }: { isActive: boolean }): string {
 
 /** Application shell: header with navigation and wallet access. */
 export function Layout() {
-  const vaultAddress = useOnboardingStore((state) => state.vaultAddress);
-  const showAppNav = DEMO_MODE || vaultAddress !== "";
+  const showAppNav = true;
 
   return (
     <div className="flex min-h-full flex-col bg-bg-primary">
