@@ -414,8 +414,19 @@ export function Setup() {
         <div className="mb-4 rounded-lg border border-border bg-bg-tertiary p-4">
           <p className="text-sm font-medium text-text-primary">Executor (bot) address</p>
           <p className="mt-1 text-xs text-text-secondary">
-            Run <code>npx safegpt-bot init</code> to create an executor wallet, then paste its address here.
+            Run <code className="rounded bg-bg-secondary px-1">npx safegpt-bot init</code> to create an executor wallet,
+            then paste its address here. Or run{" "}
+            <code className="rounded bg-bg-secondary px-1">safegpt-bot-init.bat</code> from the project root.
           </p>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={() => navigator.clipboard.writeText("npx safegpt-bot init")}
+              className="rounded-lg border border-border px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary"
+            >
+              Copy command
+            </button>
+          </div>
           <input
             value={executor}
             onChange={(e) => setExecutor(e.target.value as Address)}
