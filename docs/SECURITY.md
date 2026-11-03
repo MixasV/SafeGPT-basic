@@ -33,7 +33,7 @@ those are exactly the actions that require the wallet to sign.
 |---|---|---|
 | Protected wallet key | The wallet is the *victim*; assume it is compromised | Everything in the wallet |
 | Executor key | Runs on the operator's machine; the bot holds it | `rescue()` — but only to the stored `safeAddress` |
-| Owner key (Vault) | The protected wallet itself | Configuration changes, all behind a immutable (no setter) |
+| Owner key (Vault) | The protected wallet itself | Configuration changes (executor, whitelist) behind a 72-hour timelock + confirmation. `safeAddress` is immutable |
 | Guardian key (Guardian Module (Preventive Protection)) | Operator-controlled, must be unique per wallet | Veto and confirm. Cannot move funds |
 | RPC provider | Third party | Can lie about or censor transactions. See §6 |
 | Hosted platform | Only in `safegpt-platform`, not here | See the platform's own documents |
@@ -55,9 +55,12 @@ mnemonic.
 
 * Cannot call `rescue()`. That is `onlyExecutor` — the owner has no path to
   move funds through the vault at all.
-  whitelist. Every one of them requires **72 hours** plus an explicit
-  confirmation, and re-issuing a request invalidates any earlier approval.
+* Can request and confirm changes to `executor` and `whitelist`. Every one of
+  them requires **72 hours** plus an explicit confirmation transaction after
+  the delay, and re-issuing a request invalidates any earlier approval.
 * Can cancel a pending change at any time.
+* `safeAddress` is immutable — set in the constructor, no setter. Changing it
+  requires redeploying the vault.
 
 **Executor** (the bot's key):
 
@@ -332,7 +335,7 @@ Limits, stated precisely:
 | What | Status |
 |---|---|
 | Unit tests (bot + web) | 202 passing, 1 skipped (the skipped one needs a live RPC key) |
-| Contract tests | 54 passing (27 + 27) |
+| Contract tests | 67 passing |
 | E2E tests | 40 passing against the platform build |
 | End-to-end rescue on a local chain | Ran — the attacker received nothing, the safe address received the balance |
 | AI review of both contracts | Done — the ChainGPT Smart Contract Auditor |
