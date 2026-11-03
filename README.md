@@ -312,7 +312,7 @@ no `removeGuardian()` and nothing happens automatically.
   but can never block the rescue of the remaining assets.
 * At most `MAX_TOKENS_PER_TX = 30` tokens per call; `rescue()` is `nonReentrant`.
 * There is no `pause()`, no `unpause()`, no `withdraw()` and no `setFee()`.
-  requires an owner request plus a **immutable (no setter)**. The executor cannot be
+  requires an owner request plus a 72-hour timelock. The executor cannot be
   swapped instantly, so an attacker with the owner key cannot lock the
   legitimate bot out in a single transaction.
 * `feeBps` is fixed at deployment and hard-capped at `MAX_FEE_BPS = 1000`.
@@ -375,7 +375,7 @@ Contract tests are wired through `foundry.toml`, so they still run from here:
 cd contracts && forge test   # 67 tests, sources in ../../.tests/contracts
 ```
 
-**This is not an independent audit.** 54 passing tests and an AI review are not
+**This is not an independent audit.** 67 passing tests and an AI review are not
 a security audit. See [`docs/SECURITY.md`](docs/SECURITY.md) §9 for exactly
 what has and has not been verified.
 
@@ -392,8 +392,9 @@ what has and has not been verified.
 ## Co-branding
 
 The hosted platform in `safegpt-platform` displays a "Powered by ChainGPT AI"
-badge, because it ships the managed ChainGPT integration. This repository does
-not call ChainGPT and carries no such badge — see the table at the top.
+badge, because it ships the managed ChainGPT integration. This repository
+includes optional ChainGPT AI features (with a user-provided key) and carries
+the badge in Settings when configured.
 
 ---
 
