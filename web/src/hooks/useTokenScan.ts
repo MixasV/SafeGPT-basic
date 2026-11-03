@@ -323,7 +323,7 @@ export function useTokenScan() {
           selected: true,
           // Core requires membership of the curated list for THIS network.
           // Anything else lands in the Watch set and is rescued fee-free to the
-          // quarantine address (UPD-2).
+          // watch-set routing destination (UPD-2).
           verified: isVerifiedToken(token.address, chainId),
         })),
       );
@@ -381,7 +381,7 @@ export async function validateManualToken(address: string, chainId: number): Pro
   if (verified) {
     warnings.push("Found in the curated verified list for this network. It will be protected in the Core set.");
   } else {
-    warnings.push("Not in the curated verified list. It will be protected in the Watch set: rescued without a fee, in a separate transaction, and routed to the quarantine address.");
+    warnings.push("Not in the curated verified list. It will be protected in the Watch set: rescued without a fee, in a separate transaction, and routed to the watch-set routing destination.");
   }
 
   return { ok: true, token: info, verified, warnings };

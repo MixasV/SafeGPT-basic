@@ -99,7 +99,7 @@ const TOKEN_BEGINNER_LABELS: Record<TokenStatus, string> = {
  *   active      — every core asset is pullable and the executor is funded.
  *
  * Note that only CORE assets gate the headline. A watch token whose allowance
- * was revoked does not downgrade the whole wallet — it is quarantined by
+ * was revoked does not downgrade the whole wallet — it is isolated to the watch-set routing by
  * design, and the bot reports it as R8 in its own channel.
  */
 export function deriveProtectionStatus(input: StatusInput): ProtectionStatus {

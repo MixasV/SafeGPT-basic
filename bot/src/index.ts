@@ -132,14 +132,14 @@ function asExecutorSigner(signer: Signer, provider: JsonRpcProvider, address: st
 }
 
 /**
- * Builds the signer for a wallet. Variant A needs the executor key because the
- * vault only accepts `rescue()` from the authorised executor; Variant B's
- * guardian key is loaded but unused in this release.
+ * Builds the signer for a wallet. RescueVault mode needs the executor key
+ * because the vault only accepts `rescue()` from the authorised executor;
+ * GuardianModule's guardian key is loaded but unused in this release.
  */
 async function signerFor(wallet: WalletConfig, provider: JsonRpcProvider): Promise<ExecutorSigner> {
   const key = wallet.variant === "A" ? wallet.executorPrivateKey : wallet.guardianPrivateKey;
   if (key === undefined) {
-    throw new ConfigError(`Wallet "${wallet.label}" has no signing key for variant ${wallet.variant}.`);
+    throw new ConfigError(`Wallet "${wallet.label}" has no signing key for the configured contract mode (${wallet.variant}).`);
   }
   // `new Wallet`, not `provider.getSigner(...)`. In ethers v6 `getSigner` takes
   // the address of an account the NODE holds, and passes the value straight to

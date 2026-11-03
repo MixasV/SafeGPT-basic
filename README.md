@@ -117,9 +117,7 @@ call, so the Core/Watch classification is reproducible between two runs.
 | `web/` — Setup, Dashboard, Settings + onboarding wizard | ✅ Done |
 | `docs/` — SETUP / ARCHITECTURE / SECURITY | ✅ Done |
 
-**67 Foundry tests**, **202 unit tests** and **40 E2E tests** pass.
-The suites live in `../.tests`; `forge test` is wired to find them from
-`contracts/`.
+The core contracts are covered by Foundry tests (maintained in the separate internal harness `../.tests`). This public repo includes a minimal smoke-test reference (`contracts/`); the full suite (67 contract tests, 202 bot/web unit tests, 40 E2E) lives outside this repository and is not reproduced by `forge test` from a clean public clone.
 
 Two things are built but **not yet wired into the shipped rescue path**, and the
 documentation says so where it matters: Guardian Module (Preventive Protection) has contracts and tests but no
@@ -183,7 +181,7 @@ uses, and it costs nothing.
 ```bash
 cd contracts
 forge build
-forge test          # 67 tests, run from ../.tests/contracts
+forge test          # minimal smoke reference; full suite (67 tests) is in ../.tests/contracts
 ```
 
 ### Web

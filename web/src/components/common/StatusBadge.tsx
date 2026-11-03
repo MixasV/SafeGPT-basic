@@ -39,7 +39,7 @@ interface TrustBadgeProps {
 /**
  * UPD-2 token classification.
  * Verified tokens are rescued first, with the service fee. Unverified tokens go
- * through a separate, fee-free rescue to the quarantine address.
+ * through a separate, fee-free rescue to the watch-set routing address.
  */
 export function TrustBadge({ verified }: TrustBadgeProps) {
   return verified ? (

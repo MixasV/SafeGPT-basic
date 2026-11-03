@@ -35,7 +35,7 @@ const UNVERIFIED_WARNING =
  *
  * Every token is classified against the curated per-network list from
  * specification section 6: a listed token goes to the Core set, everything else
- * to the Watch set (fee-free rescue, quarantine routing).
+ * to the Watch set (fee-free rescue, watch-set routing routing).
  */
 export function StepSelectAssets({
   onContinue,

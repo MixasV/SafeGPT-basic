@@ -51,22 +51,18 @@ mnemonic.
 
 ### 2.3 Roles and their limits
 
-**Owner** (the protected wallet, in Rescue Vault (Reactive Protection)):
-
-* Cannot call `rescue()`. That is `onlyExecutor` — the owner has no path to
-  move funds through the vault at all.
-* Can request and confirm changes to `executor` and `whitelist`. Every one of
-  them requires **72 hours** plus an explicit confirmation transaction after
-  the delay, and re-issuing a request invalidates any earlier approval.
-* Can cancel a pending change at any time.
-* `safeAddress` is immutable — set in the constructor, no setter. Changing it
-  requires redeploying the vault.
+**Owner (Protected Wallet)**  
+- Cannot call `rescue()`. That is `onlyExecutor` — the owner has no path to move funds through the vault at all.  
+- Can request and confirm changes to **executor** and **whitelist**.  
+- These changes are protected by a **72-hour timelock** and require an explicit confirmation transaction after the delay.  
+- **`safeAddress` is immutable in the OSS RescueVault**: it is set in the constructor and has **no setter**. To change `safeAddress`, deploy a new vault and update the bot to point to the new contract.  
+- The owner **cannot** redirect funds to arbitrary recipients: `rescue()` sends tokens **only to `safeAddress`**.
 
 **Executor** (the bot's key):
 
 * Can call `rescue()` and nothing else that moves funds.
 * **Cannot choose a destination.** `rescue(address[] tokens, bool[] chargeFee)`
-  takes no recipient. The destination is decided inside the contract: the
+  takes no recipient. The destination is decided inside the contract: `safeAddress`.
 * Cannot change the fee. `feeBps` is fixed at deployment and capped at
   `MAX_FEE_BPS = 1000` (10%). There is no `setFee()`.
 
@@ -354,8 +350,7 @@ confirmation.
 ### Known gaps
 
 * **Guardian Module (Preventive Protection) has no bot executor.** The contract exists and is tested; the bot
-  cannot execute rescues through it. The bot returns
-  `VARIANT_B_UNSUPPORTED`.
+  cannot execute rescues through it. The bot reports that the guardian path is unsupported.
 * **The end-to-end rescue has been run on a local Anvil chain, not on a public
   testnet.** The full path — attack detected in the mempool, R2 matched, the
   vault front-running the attacker, the balance arriving at the safe address —

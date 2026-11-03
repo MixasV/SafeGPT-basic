@@ -313,7 +313,7 @@ export class Monitor {
       case "DRY_RUN":
         this.log(`[${wallet.label}] dry run, nothing sent: ${outcome.planned.join(" | ")}`);
         break;
-      case "VARIANT_B_UNSUPPORTED":
+      case "GUARDIAN_MODULE_UNSUPPORTED":
       case "SKIPPED":
         this.log(`[${wallet.label}] rescue not sent — ${outcome.reason}`);
         break;

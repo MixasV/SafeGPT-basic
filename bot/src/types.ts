@@ -27,9 +27,9 @@ export interface WalletConfig {
   safeAddress: string;
   vaultAddress: string;
   variant: ProtectionVariant;
-  /** Variant A only — the bot's own key, which the vault checks against `executor`. */
+  /** RescueVault mode — the bot's own key, which the vault checks against `executor`. */
   executorPrivateKey?: string;
-  /** Variant B only — held for the future guardian implementation. */
+  /** GuardianModule mode — held for the future guardian implementation. */
   guardianPrivateKey?: string;
   coreTokens: TokenConfig[];
   watchTokens: TokenConfig[];

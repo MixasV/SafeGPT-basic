@@ -53,7 +53,7 @@ export interface SelectedAsset {
    */
   balance: string;
   selected: boolean;
-  /** Unverified / watch-set token: rescued without a fee and routed to quarantine. */
+  /** Unverified / watch-set token: rescued without a fee and routed to watch-set routing. */
   verified: boolean;
   /** Rescue threshold in the token's smallest unit (Pro mode). */
   threshold?: string;

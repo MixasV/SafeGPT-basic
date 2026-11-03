@@ -69,7 +69,7 @@ export type RescueOutcome =
   | { status: "SENT"; txHashes: string[]; tokens: string[] }
   | { status: "DRY_RUN"; planned: string[] }
   | { status: "SKIPPED"; reason: string }
-  | { status: "VARIANT_B_UNSUPPORTED"; reason: string };
+  | { status: "GUARDIAN_MODULE_UNSUPPORTED"; reason: string };
 
 const coder = AbiCoder.defaultAbiCoder();
 const SELECTOR_RESCUE = id("rescue(address[],bool[])").slice(0, 10);
@@ -116,7 +116,7 @@ export class Executor {
 
   /**
    * Runs a full rescue for one wallet: core tokens first (fee charged), then
-   * the watch list (no fee, quarantined), each in its own transaction.
+   * the watch list (no fee, watch-set routing), each in its own transaction.
    *
    * @param overrideTokens When set, rescue exactly these addresses as core
    *        tokens instead of the configured lists. The post-block scanner uses
@@ -126,10 +126,10 @@ export class Executor {
   async rescue(wallet: WalletConfig, reason: RescueReason, overrideTokens?: string[]): Promise<RescueOutcome> {
     if (wallet.variant === "B") {
       const message =
-        `[${wallet.label}] GuardianModule (variant B) rescue is not yet implemented — ` +
+        `[${wallet.label}] GuardianModule (GuardianModule) rescue is not yet implemented — ` +
         `no transaction was sent. Rule ${reason.rule} fired.`;
       this.log(message);
-      return { status: "VARIANT_B_UNSUPPORTED", reason: message };
+      return { status: "GUARDIAN_MODULE_UNSUPPORTED", reason: message };
     }
 
     if (this.pendingRescues.has(wallet.vaultAddress.toLowerCase())) {
@@ -168,7 +168,7 @@ export class Executor {
     // Config order is priority order: core tokens the operator listed first are
     // the ones they most care about, so they take the first transaction slots.
     // Watch tokens follow in their own transaction so that a gas bomb in the
-    // core batch cannot block the quarantine path.
+    // core batch cannot block the watch-set path.
     const plans: Array<{ tokens: string[]; chargeFee: boolean }> = [];
     for (const chunk of chunkTokens(core.movable)) plans.push({ tokens: chunk, chargeFee: true });
     for (const chunk of chunkTokens(watch.movable)) plans.push({ tokens: chunk, chargeFee: false });
