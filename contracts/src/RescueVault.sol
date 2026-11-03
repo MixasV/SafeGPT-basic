@@ -19,7 +19,7 @@ interface IERC20 {
  *
  * @dev Security model:
  *      - {rescue} is callable ONLY by `executor` and can ONLY send tokens to
- *        the destinations held in storage. There is no arbitrary-recipient path
+ *        `safeAddress`. There is no arbitrary-recipient path
  *        and no `withdraw()`.
  *      - `safeAddress` is immutable (set in constructor, no setter). `executor`
  *        and `whitelist` can only be mutated by the owner AND only after a

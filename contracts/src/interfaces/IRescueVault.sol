@@ -5,8 +5,8 @@ pragma solidity ^0.8.24;
  * @title IRescueVault
  * @notice Public interface of the SafeGPT RescueVault.
  * @dev The vault escrows no funds of its own: it only moves tokens that the
- *      `owner` has explicitly approved to this contract, and only ever to the
- *      destinations held in storage.
+ *      `owner` has explicitly approved to this contract, and only ever to
+ *      `safeAddress`.
  *
  *      The contract deliberately exposes NO pause, unpause, withdraw or setFee
  *      entry points. `feeBps` is immutable after deployment, and `safeAddress`
