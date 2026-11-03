@@ -21,7 +21,7 @@ interface IERC20 {
  *      - {rescue} is callable ONLY by `executor` and can ONLY send tokens to
  *        the destinations held in storage. There is no arbitrary-recipient path
  *        and no `withdraw()`.
- *      - `safeAddress`, `quarantineAddress`, `executor` and `whitelist` can only
+ *      - `safeAddress`, `executor` and `whitelist` can only
  *        be mutated by the owner AND only after a 72-hour timelock, so a stolen
  *        owner key cannot redirect a rescue or lock the bot out instantly.
  *      - `feeBps` is fixed at deployment and hard-capped by {MAX_FEE_BPS}.
@@ -43,9 +43,6 @@ contract RescueVault is IRescueVault {
 
     /// @notice Delay that must elapse before an executor change is applied.
     uint256 public constant EXECUTOR_CHANGE_DELAY = 72 hours;
-
-    /// @notice Delay that must elapse before a quarantine address change is applied.
-    uint256 public constant QUARANTINE_CHANGE_DELAY = 72 hours;
 
     /// @notice Delay that must elapse before a whitelist change is applied.
     uint256 public constant WHITELIST_CHANGE_DELAY = 72 hours;
@@ -84,9 +81,6 @@ contract RescueVault is IRescueVault {
     address public immutable safeAddress;
 
     /// @inheritdoc IRescueVault
-    address public quarantineAddress;
-
-    /// @inheritdoc IRescueVault
     address public executor;
 
     /// @inheritdoc IRescueVault
@@ -100,12 +94,6 @@ contract RescueVault is IRescueVault {
 
     /// @notice Timestamp of a pending ETH withdrawal request, or 0.
     uint256 public withdrawRequestTime;
-
-    /// @inheritdoc IRescueVault
-    address public pendingQuarantineAddress;
-
-    /// @inheritdoc IRescueVault
-    uint256 public quarantineChangeRequestTime;
 
     /// @inheritdoc IRescueVault
     address public pendingExecutor;
@@ -195,43 +183,6 @@ contract RescueVault is IRescueVault {
         for (uint256 i; i < length; ++i) {
             _rescueOne(tokens[i], chargeFee[i]);
         }
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                          QUARANTINE ADDRESS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @inheritdoc IRescueVault
-    function requestQuarantineChange(address newQuarantine) external onlyOwner {
-        require(newQuarantine != address(0), "RescueVault: newQuarantine is zero address");
-        require(newQuarantine != owner, "RescueVault: newQuarantine must differ from owner");
-
-        pendingQuarantineAddress = newQuarantine;
-        quarantineChangeRequestTime = block.timestamp;
-
-        emit QuarantineChangeRequested(newQuarantine, block.timestamp);
-    }
-
-    /// @inheritdoc IRescueVault
-    function confirmQuarantineChange() external onlyOwner {
-        require(pendingQuarantineAddress != address(0), "RescueVault: no pending quarantine change");
-        require(
-            block.timestamp >= quarantineChangeRequestTime + QUARANTINE_CHANGE_DELAY,
-            "RescueVault: quarantine change timelock not elapsed"
-        );
-
-        quarantineAddress = pendingQuarantineAddress;
-        pendingQuarantineAddress = address(0);
-
-        emit QuarantineChangeConfirmed(quarantineAddress);
-    }
-
-    /// @inheritdoc IRescueVault
-    function cancelQuarantineChange() external onlyOwner {
-        pendingQuarantineAddress = address(0);
-        quarantineChangeRequestTime = 0;
-
-        emit QuarantineChangeCancelled();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -400,10 +351,8 @@ contract RescueVault is IRescueVault {
             return;
         }
 
-        // Watch-set tokens (chargeFee == false) go to quarantine so that the cold
-        // wallet stays clean; with no quarantine configured they fall back to the
-        // safe address, which is the default single-destination behaviour.
-        address destination = (!chargeFee && quarantineAddress != address(0)) ? quarantineAddress : safeAddress;
+        // All rescued tokens go to the safe address.
+        address destination = safeAddress;
 
         uint256 fee = chargeFee ? ((balance * feeBps) / BPS_DENOMINATOR) : 0;
         uint256 amount = balance - fee;

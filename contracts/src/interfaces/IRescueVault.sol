@@ -10,7 +10,6 @@ pragma solidity ^0.8.24;
  *
  *      The contract deliberately exposes NO pause, unpause, withdraw or setFee
  *      entry points. `feeBps` is immutable after deployment, and `safeAddress`,
- *      `quarantineAddress`, `executor` and `whitelist` mutations are all gated
  *      behind a 72-hour timelock so that a compromised owner key cannot
  *      redirect a rescue in a single transaction (UPD-3, rule 16).
  */
@@ -45,14 +44,8 @@ interface IRescueVault {
     /// @notice Emitted when ERC-20 tokens stuck on the vault are withdrawn.
     event StuckTokensWithdrawn(address indexed token, address indexed to, uint256 amount);
 
-    /// @notice Emitted when the owner schedules a change of the quarantine address.
-    event QuarantineChangeRequested(address indexed newQuarantineAddress, uint256 requestedAt);
 
-    /// @notice Emitted when a pending quarantine address change is confirmed.
-    event QuarantineChangeConfirmed(address indexed newQuarantineAddress);
 
-    /// @notice Emitted when the owner cancels a pending quarantine address change.
-    event QuarantineChangeCancelled();
 
     /// @notice Emitted when the owner schedules a change of the executor (the bot).
     event ExecutorChangeRequested(address indexed newExecutor, uint256 requestedAt);
@@ -86,7 +79,6 @@ interface IRescueVault {
     function safeAddress() external view returns (address);
 
     /// @notice The destination for unverified (watch-set) assets, or the zero address.
-    function quarantineAddress() external view returns (address);
 
     /// @notice The only address allowed to call {rescue}.
     function executor() external view returns (address);
@@ -103,11 +95,7 @@ interface IRescueVault {
     /// @notice Timestamp of a pending ETH withdrawal request, or 0.
     function withdrawRequestTime() external view returns (uint256);
 
-    /// @notice The quarantine address awaiting confirmation, or the zero address.
-    function pendingQuarantineAddress() external view returns (address);
 
-    /// @notice The timestamp at which {pendingQuarantineAddress} was requested.
-    function quarantineChangeRequestTime() external view returns (uint256);
 
     /// @notice The executor awaiting confirmation, or the zero address.
     function pendingExecutor() external view returns (address);
@@ -130,8 +118,6 @@ interface IRescueVault {
     /// @notice Delay that must elapse before an executor change is applied.
     function EXECUTOR_CHANGE_DELAY() external view returns (uint256);
 
-    /// @notice Delay that must elapse before a quarantine address change is applied.
-    function QUARANTINE_CHANGE_DELAY() external view returns (uint256);
 
     /// @notice Delay that must elapse before a whitelist change can be confirmed.
     function WHITELIST_CHANGE_DELAY() external view returns (uint256);
@@ -153,13 +139,11 @@ interface IRescueVault {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Moves tokens out of the owner to the safe or quarantine address.
      * @dev Callable only by the executor, at most {MAX_TOKENS_PER_TX} tokens per
      *      call, and each token is processed in isolation: a reverting token, a
      *      gas bomb or a malformed return value can never take down the rest of
      *      the batch. `chargeFee[i] == true` routes the token to `safeAddress`
      *      and charges the service fee; `chargeFee[i] == false` routes it to
-     *      `quarantineAddress` (or `safeAddress` when none is configured) and
      *      charges no fee.
      * @param tokens The ERC-20 token addresses to rescue.
      * @param chargeFee Per-token flag, must have the same length as `tokens`.
@@ -178,14 +162,8 @@ interface IRescueVault {
     /// @notice Withdraw ERC-20 tokens sent directly to the vault. Callable only by the safe address.
     function withdrawStuckTokens(address token) external;
 
-    /// @notice Schedules a new quarantine address for unverified (watch-set) tokens.
-    function requestQuarantineChange(address newQuarantine) external;
 
-    /// @notice Applies the pending quarantine address once the timelock has elapsed.
-    function confirmQuarantineChange() external;
 
-    /// @notice Drops the pending quarantine address change.
-    function cancelQuarantineChange() external;
 
     /// @notice Schedules a new executor. Applies after {SAFE_CHANGE_DELAY} + {confirmExecutorChange}.
     function requestExecutorChange(address newExecutor) external;
