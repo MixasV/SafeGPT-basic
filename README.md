@@ -46,13 +46,14 @@ So the following are **absent here on purpose**, not missing:
 | Not here | Why | Where it is |
 |---|---|---|
 | Landing, Pricing, About, Case Study, Open Source pages | Marketing surfaces for the hosted service | `safegpt-platform/web` |
-| ChainGPT chat, contract auditor, contract creator | The ChainGPT integration is platform-only | `safegpt-platform/web` |
+| ChainGPT chat, contract auditor, contract creator | Optional in core (user-provided key) — also available in platform | `safegpt-core/web` (optional) / `safegpt-platform/web` |
 | Cloudflare proxy Worker | Holds the shared platform API key on a server | `safegpt-platform/proxy` |
 | Plan / tier switcher (Basic, Pro, Guardian+) | Subscription tiers on a hosted service | `safegpt-platform/web` |
 | Test suites | Development tooling, not product | [`../.tests`](../.tests) |
 
-None of it is stubbed out either. `core` has no AI assistant because it has no
-AI integration — not a disabled one that pretends.
+None of it is stubbed out either. AI features are optional: without a key they
+show a disabled state, but protection works fully. With a key they enable AI
+Security Review, Ask AI, Explain Alert, Contract Auditor and Contract Creator.
 
 What remains is the part that actually protects a wallet.
 
@@ -63,7 +64,7 @@ What remains is the part that actually protects a wallet.
 | The contracts, the bot, the rule engine | Yes. This is the whole product |
 | The wizard, the dashboard | Yes |
 | Demo Mode | Yes — no wallet, no gas, no transactions |
-| An AI assistant, an auditor | **There is none here.** They are in `safegpt-platform` |
+| An AI assistant, an auditor | Optional — requires a ChainGPT API key (Settings) |
 
 Nothing in this repository needs a ChainGPT key, a platform account, a
 subscription or our servers. The MIT core is not a free tier of our SaaS; it
@@ -80,7 +81,7 @@ repository yourself costs:
 | An RPC endpoint | Your provider's price. A free tier covers one wallet |
 | Gas for deploy, approvals and rescues | Real money, in ETH |
 | The executor's gas balance | Real money, and it has to stay topped up |
-| AI requests | None. There is no AI here |
+| AI requests | Optional. Without a key: none. With a key: ~$0.005 per check |
 | The service fee | None. `feeBps` is fixed at deployment, capped at 10%. Set it to 0 |
 
 ---
