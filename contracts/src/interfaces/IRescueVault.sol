@@ -9,9 +9,8 @@ pragma solidity ^0.8.24;
  *      destinations held in storage.
  *
  *      The contract deliberately exposes NO pause, unpause, withdraw or setFee
- *      entry points. `feeBps` is immutable after deployment, and `safeAddress`,
- *      behind a 72-hour timelock so that a compromised owner key cannot
- *      redirect a rescue in a single transaction (UPD-3, rule 16).
+ *      entry points. `feeBps` is immutable after deployment, and `safeAddress`
+ *      is immutable (set in constructor, no setter).
  */
 interface IRescueVault {
     /*//////////////////////////////////////////////////////////////
@@ -112,9 +111,6 @@ interface IRescueVault {
     /// @notice Timestamp of the pending whitelist removal for `account`, or 0.
     function pendingWhitelistRemove(address account) external view returns (uint256);
 
-    /// @notice Delay that must elapse before a safe address change is applied.
-    function SAFE_CHANGE_DELAY() external view returns (uint256);
-
     /// @notice Delay that must elapse before an executor change is applied.
     function EXECUTOR_CHANGE_DELAY() external view returns (uint256);
 
@@ -165,7 +161,7 @@ interface IRescueVault {
 
 
 
-    /// @notice Schedules a new executor. Applies after {SAFE_CHANGE_DELAY} + {confirmExecutorChange}.
+    /// @notice Schedules a new executor. Applies after {EXECUTOR_CHANGE_DELAY} + {confirmExecutorChange}.
     function requestExecutorChange(address newExecutor) external;
 
     /// @notice Applies the pending executor once the timelock has elapsed.

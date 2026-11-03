@@ -125,7 +125,7 @@ isolation.
 
 | Change | Delay |
 |---|---|
-| `safeAddress` | 72 hours |
+| `safeAddress` | immutable (no change possible) |
 | `executor` | 72 hours |
 | `whitelist` add / remove | 72 hours |
 

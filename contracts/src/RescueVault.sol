@@ -21,9 +21,10 @@ interface IERC20 {
  *      - {rescue} is callable ONLY by `executor` and can ONLY send tokens to
  *        the destinations held in storage. There is no arbitrary-recipient path
  *        and no `withdraw()`.
- *      - `safeAddress`, `executor` and `whitelist` can only
- *        be mutated by the owner AND only after a 72-hour timelock, so a stolen
- *        owner key cannot redirect a rescue or lock the bot out instantly.
+ *      - `safeAddress` is immutable (set in constructor, no setter). `executor`
+ *        and `whitelist` can only be mutated by the owner AND only after a
+ *        72-hour timelock, so a stolen owner key cannot redirect a rescue or
+ *        lock the bot out instantly.
  *      - `feeBps` is fixed at deployment and hard-capped by {MAX_FEE_BPS}.
  *      - Every token in a rescue batch is processed in isolation with a bounded
  *        gas stipend. A hostile token contract (reverting, gas-burning, or
@@ -37,9 +38,6 @@ contract RescueVault is IRescueVault {
     /*//////////////////////////////////////////////////////////////
                                 CONSTANTS
     //////////////////////////////////////////////////////////////*/
-
-    /// @notice Delay that must elapse before a safe address change is applied.
-    uint256 public constant SAFE_CHANGE_DELAY = 72 hours;
 
     /// @notice Delay that must elapse before an executor change is applied.
     uint256 public constant EXECUTOR_CHANGE_DELAY = 72 hours;

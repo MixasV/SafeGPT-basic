@@ -41,8 +41,8 @@ those are exactly the actions that require the wallet to sign.
 ### 2.2 Why `safeAddress` must stay under independent control
 
 `safeAddress` is the only destination rescued funds can reach. The executor key
-cannot redirect them, and the owner cannot change it without a 72-hour delay
-during which the user can cancel.
+cannot redirect them. `safeAddress` is immutable — set in the constructor, no
+setter. A stolen protected-wallet key cannot change the destination.
 
 If the same key controls the protected wallet and the safe address, a stolen
 wallet key moves the money by two steps instead of one, and the "safe" address

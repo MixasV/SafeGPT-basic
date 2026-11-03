@@ -116,7 +116,7 @@ call, so the Core/Watch classification is reproducible between two runs.
 | `web/` — Setup, Dashboard, Settings + onboarding wizard | ✅ Done |
 | `docs/` — SETUP / ARCHITECTURE / SECURITY | ✅ Done |
 
-**54 Foundry tests** (27 + 27), **202 unit tests** and **40 E2E tests** pass.
+**67 Foundry tests**, **202 unit tests** and **40 E2E tests** pass.
 The suites live in `../.tests`; `forge test` is wired to find them from
 `contracts/`.
 
