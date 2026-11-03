@@ -142,7 +142,7 @@ export function StepDeployProtection({
                 data-testid="variant-b"
                 className="accent-accent-yellow"
               />
-              <span className="text-sm font-medium text-text-primary">Variant B — Guardian+</span>
+              <span className="text-sm font-medium text-text-primary">Guardian Module</span>
             </span>
             <span className="mt-1 block pl-6 text-xs text-text-secondary">
               Waitlist. Timelock and veto instead of a standing approval.

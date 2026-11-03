@@ -116,7 +116,7 @@ forge build
 The Foundry test suite lives outside this repository, in `../../.tests`:
 
 ```bash
-forge test          # 54 tests
+forge test          # 67 tests
 ```
 
 ### B.3 Generate the frontend artifacts
@@ -156,7 +156,7 @@ export EXECUTOR_PRIVATE_KEY=0x...      # the executor key
 export PROTECTED_WALLET=0x...         # the cold-storage wallet to protect
 export SAFE_ADDRESS=0x...             # where rescued funds land
 export FEE_RECEIVER=0x...             # service fee recipient
-export FEE_BPS=500                     # 5%, hard cap 1000 (10%)
+export FEE_BPS=0                      # 0% for OSS self-hosted, hard cap 1000 (10%)
 export VAULT_SALT=0x...               # 32-byte CREATE2 salt
 
 forge script script/Deploy.s.sol:Deploy --rpc-url "$RPC_URL" --broadcast
@@ -164,7 +164,7 @@ forge script script/Deploy.s.sol:Deploy --rpc-url "$RPC_URL" --broadcast
 
 Record the deployed vault address.
 
-**Variant B** is a separate deployment:
+**Guardian Module (Preventive Protection)** is a separate deployment:
 
 ```bash
 export DEPLOYER_PRIVATE_KEY=0x...
@@ -227,7 +227,6 @@ wallets:
   no USD oracle. Omitting it triggers on *any* transfer, which is the stricter
   setting and usually the right one for cold storage.
 * Core tokens are verified and listed by you. Watch tokens are pre-registered
-  or unverified, are rescued **without a fee**, and go to the quarantine
   address so an unverified airdrop never reaches the cold wallet.
 * The whitelist lists destinations you legitimately interact with. Anything
   else is a rescue trigger.
@@ -249,8 +248,6 @@ drain, that token cannot be rescued by any means. See
 
 ```bash
 export EXECUTOR_KEY=0x...
-export TG_BOT_TOKEN=...
-export TG_CHAT_ID=...
 
 npm run bot -- --config config/config.yaml --dry-run
 ```

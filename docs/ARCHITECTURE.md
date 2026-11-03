@@ -30,7 +30,7 @@ version was wrong and this one is right.
 ┌────────────────────────────────┐      ┌─────────────────────────────────┐
 │  contracts/  (Solidity)        │      │  Chain                          │
 │                                │      │                                 │
-│  RescueVault (Variant A)       │◀─────│  ERC-20 contracts               │
+│  RescueVault (Rescue Vault (Reactive Protection))       │◀─────│  ERC-20 contracts               │
 │  SafeGPTGuardianModule (B)     │      │  Public mempool                 │
 │  RescueVaultFactory (CREATE2)  │      │  Confirmed state                │
 └────────────────────────────────┘      └─────────────────────────────────┘
@@ -46,7 +46,7 @@ compromised web origin can leak setup data; it cannot drain a vault.
 
 ---
 
-## 2. Variant A — the rescue path
+## 2. Rescue Vault (Reactive Protection) — the rescue path
 
 ### 2.1 Flow
 
@@ -60,7 +60,6 @@ RPC / mempool / blocks
   → allowance preflight
   → funded executor
   → RescueVault.rescue(tokens, chargeFee)
-  → configured safeAddress  (or quarantineAddress for watch tokens)
 ```
 
 ### 2.2 The real ABI
@@ -77,7 +76,6 @@ function rescue(address[] calldata tokens, bool[] calldata chargeFee) external;
 * `tokens` — the ERC-20 addresses to move.
 * `chargeFee` — per token: `true` takes the service fee and routes to the
   `safeAddress`; `false` charges nothing and routes to the
-  `quarantineAddress`.
 * **There is no `to` parameter, no `amounts` parameter, and no `msg.value`.**
   The destination and the amount are decided inside the contract. The executor
   cannot redirect funds by any means.
@@ -88,7 +86,6 @@ Access control: `onlyExecutor`, and `nonReentrant`.
 function owner() external view returns (address);
 function executor() external view returns (address);
 function safeAddress() external view returns (address);
-function quarantineAddress() external view returns (address);
 function feeReceiver() external view returns (address);
 function feeBps() external view returns (uint16);
 function whitelist(address account) external view returns (bool);
@@ -104,8 +101,6 @@ event RescueSkipped(address indexed token, bytes32 reason);
 
 Plus the configuration-change events: `SafeChangeRequested` / `SafeChangeConfirmed` /
 `SafeChangeCancelled`, `ExecutorChangeRequested` / `ExecutorChanged` /
-`ExecutorChangeCancelled`, `QuarantineChangeRequested` / `QuarantineChangeConfirmed` /
-`QuarantineChangeCancelled`, `WhitelistAddRequested` / `WhitelistAdded` /
 `WhitelistRemoveRequested` / `WhitelistRemoved`.
 
 ### 2.4 What happens inside `rescue()`
@@ -116,8 +111,6 @@ Plus the configuration-change events: `SafeChangeRequested` / `SafeChangeConfirm
    * `balanceOf` read under a `BALANCE_GAS_LIMIT = 50_000` gas cap via
      `staticcall`. On failure → `RescueSkipped(token, REASON_BALANCE_OF)`.
    * Zero balance → `RescueSkipped(token, ZERO_BALANCE)`.
-   * Destination: `chargeFee == false && quarantineAddress != address(0)`
-     → `quarantineAddress`, otherwise → `safeAddress`.
    * Fee: `balance * feeBps / 10_000`, charged in **the token itself**, taken by
      a second `transferFrom` to the `feeReceiver`. `msg.value` is not used.
    * The transfer runs under a `TOKEN_GAS_LIMIT = 250_000` gas cap. A token
@@ -134,7 +127,6 @@ isolation.
 |---|---|
 | `safeAddress` | 72 hours |
 | `executor` | 72 hours |
-| `quarantineAddress` | 72 hours |
 | `whitelist` add / remove | 72 hours |
 
 Every one of them is a three-step flow: `requestX` → wait → `confirmX`, with
@@ -161,7 +153,7 @@ before interacting with it.
 
 ---
 
-## 3. Variant B — the guardian module
+## 3. Guardian Module (Preventive Protection) — the guardian module
 
 **`SafeGPTGuardianModule` is a standalone smart account.** It is not a Gnosis
 Safe module, it is not compatible with Safe multisig accounts, and calling it
@@ -193,7 +185,7 @@ function cancelTransaction(bytes32 txId) external;                              
 function emergencyExit(address[] calldata tokens) external;                           // onlyOwner
 ```
 
-Configuration changes use the same shape as Variant A, with one extra step:
+Configuration changes use the same shape as Rescue Vault (Reactive Protection), with one extra step:
 
 ```
 requestSafeChange → guardianConfirmSafeChange → 72h → confirmSafeChange
@@ -228,7 +220,7 @@ reverts with `SafeAddressCannotBeUnlisted()`. Funds always have an exit path.
 ### 3.5 Contract versus integration
 
 **The contract is not connected to the bot.** The bot returns
-`VARIANT_B_UNSUPPORTED` for a Variant B wallet. There is no guardian key
+`VARIANT_B_UNSUPPORTED` for a Guardian Module (Preventive Protection) wallet. There is no guardian key
 management, no confirm workflow, and no hosted service that runs guardians.
 
 A contract with 27 passing tests is not a working product. See
@@ -304,12 +296,10 @@ Two lists per wallet, and they are treated differently:
 |---|---|---|
 | Source | Verified tokens the operator configured | Pre-registered or unverified tokens |
 | Fee | Charged (`chargeFee = true`) | **Not** charged (`chargeFee = false`) |
-| Destination | `safeAddress` | `quarantineAddress` |
 | Transaction | Its own | A separate one, after the core batch |
 | Cooldown | 1 hour | 15 minutes, max 3 per hour |
 
 The separation is deliberate. A gas bomb in the core batch must not be able to
-block the quarantine path, and an unverified airdrop must never reach the cold
 wallet.
 
 **Order is configuration order, not USD value.** There is no price oracle and
@@ -328,7 +318,7 @@ Chunks are capped at `MAX_TOKENS_PER_TX = 30` tokens, matching the contract.
 
 Checked before anything is sent:
 
-1. **Variant B?** → `VARIANT_B_UNSUPPORTED`. Not sent.
+1. **Guardian Module (Preventive Protection)?** → `VARIANT_B_UNSUPPORTED`. Not sent.
 2. **Signer matches the vault's executor?** The address is compared against
    `vault.executor()`. A mismatch → `SKIPPED`. (The contract would reject it
    anyway; catching it here avoids a wasted transaction.)
@@ -503,12 +493,9 @@ at runtime by any external API — see
 
 ## 11. The AI and auditor path
 
-**This repository has no AI integration.** The ChainGPT client, the chat
-widget, the contract auditor and the contract creator live in
-`safegpt-platform`, which is proprietary.
+ChainGPT AI integration is optional. Users can provide their own API key in Settings. Without a key, all AI features show a disabled state but protection remains fully functional. With a key: enables AI Security Review, Ask AI, Explain Alert, Contract Auditor, Contract Creator.
 
-The path in the platform, for reference, is deliberately outside the rescue
-path:
+The path is deliberately outside the rescue path:
 
 ```
 User action → AI client / proxy → ChainGPT → explanation or report

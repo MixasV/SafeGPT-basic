@@ -110,8 +110,8 @@ call, so the Core/Watch classification is reproducible between two runs.
 
 | Component | Status |
 |---|---|
-| `contracts/` — RescueVault (Variant A) | ✅ Done |
-| `contracts/` — SafeGPTGuardianModule (Variant B) | ✅ Done |
+| `contracts/` — RescueVault (Rescue Vault (Reactive Protection)) | ✅ Done |
+| `contracts/` — SafeGPTGuardianModule (Guardian Module (Preventive Protection)) | ✅ Done |
 | `bot/` — mempool monitor, rules, executor, alerts | ✅ Done |
 | `web/` — Setup, Dashboard, Settings + onboarding wizard | ✅ Done |
 | `docs/` — SETUP / ARCHITECTURE / SECURITY | ✅ Done |
@@ -121,7 +121,7 @@ The suites live in `../.tests`; `forge test` is wired to find them from
 `contracts/`.
 
 Two things are built but **not yet wired into the shipped rescue path**, and the
-documentation says so where it matters: Variant B has contracts and tests but no
+documentation says so where it matters: Guardian Module (Preventive Protection) has contracts and tests but no
 bot executor. The end-to-end rescue has been run against a local Anvil chain --
 the attacker received nothing -- but never against a public testnet with a real
 competitor. See
@@ -136,7 +136,7 @@ safegpt-core/
 │   ├── src/
 │   │   ├── RescueVault.sol            # Rescue contract (single template)
 │   │   ├── RescueVaultFactory.sol     # CREATE2 factory
-│   │   ├── SafeGPTGuardianModule.sol  # Variant B smart account
+│   │   ├── SafeGPTGuardianModule.sol  # Guardian Module (Preventive Protection) smart account
 │   │   └── interfaces/
 │   ├── script/Deploy.s.sol
 │   └── foundry.toml
@@ -182,7 +182,7 @@ uses, and it costs nothing.
 ```bash
 cd contracts
 forge build
-forge test          # 54 tests, run from ../.tests/contracts
+forge test          # 67 tests, run from ../.tests/contracts
 ```
 
 ### Web
@@ -223,8 +223,6 @@ Secrets are read from the environment, never from the config file:
 
 ```bash
 export EXECUTOR_KEY=0x...     # bot key; its address must equal the vault's executor
-export TG_BOT_TOKEN=...       # alerts
-export TG_CHAT_ID=...
 ```
 
 ---
@@ -234,7 +232,7 @@ export TG_CHAT_ID=...
 SafeGPT ships two independent contracts. Pick per wallet; they are not layered
 on each other.
 
-| | Variant A — `RescueVault` | Variant B — `SafeGPTGuardianModule` |
+| | Rescue Vault (Reactive Protection) — `RescueVault` | Guardian Module (Preventive Protection) — `SafeGPTGuardianModule` |
 |---|---|---|
 | Model | Rescue before the attack | Timelock + veto on every action |
 | Who can move funds | The bot (`executor`), only to the safe address | Nobody alone — the guardian must confirm |
@@ -244,7 +242,7 @@ on each other.
 | Extra dependency | None | A second key on separate hardware |
 | Best for | Earning from the service fee | Users who will not accept any custody assumption |
 
-### Variant A — RescueVault
+### Rescue Vault (Reactive Protection) — RescueVault
 
 The bot watches the mempool, sees a suspicious transaction leaving your wallet,
 and front-runs it with a higher-gas transaction that moves your approved tokens to
@@ -258,7 +256,7 @@ export EXECUTOR_PRIVATE_KEY=0x...      # bot key; its address becomes the execut
 export PROTECTED_WALLET=0x...         # cold-storage wallet to protect
 export SAFE_ADDRESS=0x...             # rescue destination, must differ from PROTECTED_WALLET
 export FEE_RECEIVER=0x...             # service fee recipient
-export FEE_BPS=500                     # 5%, hard cap 1000 (10%)
+export FEE_BPS=0                      # 0% for OSS self-hosted, hard cap 1000 (10%)
 export VAULT_SALT=0x...               # 32-byte CREATE2 salt
 
 forge script script/Deploy.s.sol:Deploy --rpc-url "$RPC_URL" --broadcast
@@ -272,7 +270,7 @@ a rescue it knows will fail — it checks allowances, drops stranded tokens, and
 sends nothing if every requested token is stranded. Read
 [docs/SECURITY.md](docs/SECURITY.md) before deploying.
 
-### Variant B — SafeGPTGuardianModule
+### Guardian Module (Preventive Protection) — SafeGPTGuardianModule
 
 The assets live in the contract itself, so no approvals are needed. The owner
 queues an action and nothing happens until a second, independent key — the
@@ -303,7 +301,7 @@ no `removeGuardian()` and nothing happens automatically.
 
 ## Security model
 
-### Variant A — RescueVault
+### Rescue Vault (Reactive Protection) — RescueVault
 
 * `rescue()` is callable **only** by `executor`, and can send funds **only** to
   the `safeAddress` and `feeReceiver` stored in the contract.
@@ -313,12 +311,10 @@ no `removeGuardian()` and nothing happens automatically.
   but can never block the rescue of the remaining assets.
 * At most `MAX_TOKENS_PER_TX = 30` tokens per call; `rescue()` is `nonReentrant`.
 * There is no `pause()`, no `unpause()`, no `withdraw()` and no `setFee()`.
-* Changing `safeAddress`, `quarantineAddress`, `executor` or the `whitelist`
-  requires an owner request plus a **72-hour timelock**. The executor cannot be
+  requires an owner request plus a **immutable (no setter)**. The executor cannot be
   swapped instantly, so an attacker with the owner key cannot lock the
   legitimate bot out in a single transaction.
 * `feeBps` is fixed at deployment and hard-capped at `MAX_FEE_BPS = 1000`.
-* Watch-set tokens (`chargeFee = false`) are routed to `quarantineAddress` so
   that unverified airdrops never reach the cold wallet.
 * Every user runs the **same contract bytecode** — only constructor arguments
   differ (deployed via CREATE2 by the factory).
@@ -328,7 +324,7 @@ no `removeGuardian()` and nothing happens automatically.
   an attacker takes, and a control that invites it belongs outside this
   interface.
 
-### Variant B — SafeGPTGuardianModule
+### Guardian Module (Preventive Protection) — SafeGPTGuardianModule
 
 * **Nothing executes without an explicit guardian confirmation.** There is no
   timeout and no timer that can execute or expire a queued transaction. A silent
@@ -340,7 +336,7 @@ no `removeGuardian()` and nothing happens automatically.
 * The safe address is whitelisted from construction and can **never** be
   unlisted, so funds always have an exit path.
 * Safe-address and whitelist changes each require owner request → guardian
-  approval → 72h timelock → owner confirmation.
+  approval → immutable (no setter) → owner confirmation.
 * Guardian confirms are rate limited to 5 per hour, so a leaked guardian key
   cannot green-light a whole batch.
 * The queue is capped at `MAX_QUEUE_SIZE = 200` so the emergency exit always fits
@@ -375,7 +371,7 @@ npm run test:e2e             # Playwright, builds the platform app
 Contract tests are wired through `foundry.toml`, so they still run from here:
 
 ```bash
-cd contracts && forge test   # 54 tests, sources in ../../.tests/contracts
+cd contracts && forge test   # 67 tests, sources in ../../.tests/contracts
 ```
 
 **This is not an independent audit.** 54 passing tests and an AI review are not

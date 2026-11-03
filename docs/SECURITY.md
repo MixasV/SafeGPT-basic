@@ -33,8 +33,8 @@ those are exactly the actions that require the wallet to sign.
 |---|---|---|
 | Protected wallet key | The wallet is the *victim*; assume it is compromised | Everything in the wallet |
 | Executor key | Runs on the operator's machine; the bot holds it | `rescue()` — but only to the stored `safeAddress` |
-| Owner key (Vault) | The protected wallet itself | Configuration changes, all behind a 72-hour timelock |
-| Guardian key (Variant B) | Operator-controlled, must be unique per wallet | Veto and confirm. Cannot move funds |
+| Owner key (Vault) | The protected wallet itself | Configuration changes, all behind a immutable (no setter) |
+| Guardian key (Guardian Module (Preventive Protection)) | Operator-controlled, must be unique per wallet | Veto and confirm. Cannot move funds |
 | RPC provider | Third party | Can lie about or censor transactions. See §6 |
 | Hosted platform | Only in `safegpt-platform`, not here | See the platform's own documents |
 
@@ -51,11 +51,10 @@ mnemonic.
 
 ### 2.3 Roles and their limits
 
-**Owner** (the protected wallet, in Variant A):
+**Owner** (the protected wallet, in Rescue Vault (Reactive Protection)):
 
 * Cannot call `rescue()`. That is `onlyExecutor` — the owner has no path to
   move funds through the vault at all.
-* Can request a change to `safeAddress`, `quarantineAddress`, `executor` or the
   whitelist. Every one of them requires **72 hours** plus an explicit
   confirmation, and re-issuing a request invalidates any earlier approval.
 * Can cancel a pending change at any time.
@@ -65,11 +64,10 @@ mnemonic.
 * Can call `rescue()` and nothing else that moves funds.
 * **Cannot choose a destination.** `rescue(address[] tokens, bool[] chargeFee)`
   takes no recipient. The destination is decided inside the contract: the
-  `safeAddress`, or the `quarantineAddress` for watch-set tokens.
 * Cannot change the fee. `feeBps` is fixed at deployment and capped at
   `MAX_FEE_BPS = 1000` (10%). There is no `setFee()`.
 
-**Guardian** (Variant B):
+**Guardian** (Guardian Module (Preventive Protection)):
 
 * Can confirm or veto queued transactions.
 * **Cannot initiate a transfer.** `queueTransaction` is `onlyOwner`; the
@@ -85,9 +83,9 @@ mnemonic.
 |---|---|
 | Bot stopped | Nothing is detected or rescued. No asset is at risk *from stopping* — the risk is the attack proceeding unopposed |
 | Executor has no gas | The bot refuses to send: `preflight()` returns `SKIPPED` with the balance and the floor. **This check is not proactive** — see §5.2 |
-| Guardian unavailable | Variant B stalls. A queued transaction waits forever. This is the intended failure mode, not a bug |
+| Guardian unavailable | Guardian Module (Preventive Protection) stalls. A queued transaction waits forever. This is the intended failure mode, not a bug |
 | RPC provider lies | The bot acts on what it is told. A provider that hides a pending transaction makes the bot blind to it; a provider that fabricates one can cause a rescue of your own funds to the safe address, which is not a loss |
-| No guardian confirm | Variant B cannot execute. Funds stay where they are |
+| No guardian confirm | Guardian Module (Preventive Protection) cannot execute. Funds stay where they are |
 
 ---
 
@@ -173,10 +171,10 @@ snapshot lives in memory and is lost when the process restarts.
 ### 4.3 Private mempools
 
 A transaction submitted through a private relay or a builder bundle is never
-broadcast. No watcher can see it. **Variant A cannot respond to it** — the
+broadcast. No watcher can see it. **Rescue Vault (Reactive Protection) cannot respond to it** — the
 attacker's transaction simply settles first.
 
-This is not a configuration gap; it is a property of the model. Variant B does
+This is not a configuration gap; it is a property of the model. Guardian Module (Preventive Protection) does
 not depend on seeing the attack, because funds only move on an executed
 transaction the guardian confirms.
 
@@ -265,7 +263,6 @@ this produces a gap and the later transaction can stall.
 
 The verified-token list is static on purpose. A runtime API could be
 compromised, or could return a different answer between two runs, and the
-Core/Watch classification decides which assets get a fee-free quarantine
 routing. That decision has to be reproducible.
 
 ---
@@ -286,11 +283,11 @@ and, where it is testable, in the test suite.
 | 7 | With allowance = 0, a `transferFrom` rescue cannot work: a CRITICAL alert, never a fake "successful rescue" | `partitionByAllowance()`, R8 CRITICAL |
 | 8 | Core and Watch are rescued separately, and a single token's failure is isolated | Separate transactions; `RescueSkipped`/`RescueFailed` events, no batch revert |
 | 9 | The verified-token list is static and is not substituted by an external runtime API | `web/src/config/verified-tokens.ts` |
-| 10 | In Variant B an unknown transaction is **never** executed on the passage of time without a guardian confirmation | `TX_QUEUE_TIMEOUT = 0` |
+| 10 | In Guardian Module (Preventive Protection) an unknown transaction is **never** executed on the passage of time without a guardian confirmation | `TX_QUEUE_TIMEOUT = 0` |
 | 11 | No automatic guardian removal on a timer, on outage or on non-payment | `guardianRemoved` is set only by `emergencyExit()` |
 | 12 | The guardian cannot initiate a transfer or redirect funds | `queueTransaction` is `onlyOwner` |
 | 13 | The safe address cannot be removed from the whitelist | `SafeAddressCannotBeUnlisted()` |
-| 14 | Changing the safe address in Variant B requires 72 hours **and** a guardian confirmation | `requestSafeChange` → `guardianConfirmSafeChange` → 72h → `confirmSafeChange` |
+| 14 | Changing the safe address in Guardian Module (Preventive Protection) requires 72 hours **and** a guardian confirmation | `requestSafeChange` → `guardianConfirmSafeChange` → 72h → `confirmSafeChange` |
 | 15 | The only guardian removal is `emergencyExit()`: funds → safe address, pending actions cancelled, guardian removed | `emergencyExit()` |
 | 16 | There is no separate `removeGuardian()` and no automatic guardian rotation | No such function exists |
 | 17 | One unique guardian key per wallet | Enforced by configuration and by design, not by the contract |
@@ -301,7 +298,7 @@ and, where it is testable, in the test suite.
 
 ## 8. `emergencyExit()` — precisely what it does
 
-`emergencyExit(address[] tokens)` is the exit path in Variant B. It is safe
+`emergencyExit(address[] tokens)` is the exit path in Guardian Module (Preventive Protection). It is safe
 even under a stolen owner key: its only destination is the safe address, which
 an attacker holding the owner key does not control. An attacker who calls it is
 helping the user.
@@ -353,7 +350,7 @@ confirmation.
 
 ### Known gaps
 
-* **Variant B has no bot executor.** The contract exists and is tested; the bot
+* **Guardian Module (Preventive Protection) has no bot executor.** The contract exists and is tested; the bot
   cannot execute rescues through it. The bot returns
   `VARIANT_B_UNSUPPORTED`.
 * **The end-to-end rescue has been run on a local Anvil chain, not on a public

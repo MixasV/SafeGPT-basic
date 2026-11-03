@@ -12,7 +12,7 @@ problem.
 **Do not open a public issue.**
 
 Use GitHub's private vulnerability reporting on this repository
-(<https://github.com/safegpt/safegpt-core/security/advisories/new>). If that
+(<https://github.com/MixasV/SafeGPT-basic/security/advisories/new>). If that
 is unavailable for your account, open a regular issue that contains **no
 technical detail** and asks for a private channel.
 

@@ -466,7 +466,7 @@ export function strandedMessage(wallet: WalletConfig, stranded: string[]): strin
     `CRITICAL: allowance for ${stranded.join(", ")} on vault ${wallet.vaultAddress} is zero. ` +
     `RescueVault pulls funds with transferFrom(), so it CANNOT move these tokens until the owner ` +
     `re-approves. No rescue transaction was sent for them. Immediate action required: re-approve ` +
-    `the vault or move the funds manually. This is a known Variant A limitation — see README.`
+    `the vault or move the funds manually. This is a known Rescue Vault limitation — see README.`
   );
 }
 

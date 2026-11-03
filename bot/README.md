@@ -66,7 +66,7 @@ So R8 is escalated as a CRITICAL alert instead. Detection is still correct — a
 zero allowance means the drainer revoked approval to cover its tracks, and
 whatever is left is stranded until a human re-approves.
 
-### Known Variant A limitation: rescue after a revoke is impossible
+### Known Rescue Vault (Reactive Protection) limitation: rescue after a revoke is impossible
 
 The executor therefore **verifies every token's allowance before it
 broadcasts**. If a token's allowance is zero it is excluded from the rescue and
@@ -89,7 +89,7 @@ a movable watch token.
 
 **After a revoke, protection for that token is off until the owner re-approves.**
 This is an architectural property of the `transferFrom` model, not a bot defect.
-It is a further argument for Variant B, where the guardian holds execution
+It is a further argument for Guardian Module (Preventive Protection), where the guardian holds execution
 authority without depending on a token allowance.
 
 ## Rescue execution
@@ -106,7 +106,6 @@ model, not limitations to work around.
 
 - **Core tokens first, in config order.** Config order is priority order.
 - **Watch tokens in a separate transaction, fee not charged** — unverified assets
-  go to the vault's quarantine address.
 - Chunks of 30 (`RescueVault.MAX_TOKENS_PER_TX`), each its own transaction.
 - Gas estimate +20%, suggested fee +30%, explicit `pending` nonce advanced per
   chunk.
@@ -122,12 +121,12 @@ the moment a rescue is attempted. There is no background check and no alert:
 if the executor runs dry while no rule fires, the bot is silent. Watch the
 balance yourself.
 
-## Variant B
+## Guardian Module (Preventive Protection)
 
 GuardianModule wallets are detected and reported, but no rescue is sent:
 
 ```
-[Main] GuardianModule (variant B) rescue is not yet implemented — no
+[Main] Guardian Module (Preventive Protection) rescue is not yet implemented — no
 transaction was sent. Rule R1_APPROVE_UNKNOWN fired.
 ```
 
@@ -172,12 +171,10 @@ is worse than a startup error.
    `https://api.telegram.org/bot<TOKEN>/getUpdates`, or ask the bot for it.
 
 ```bash
-export TG_BOT_TOKEN=...
-export TG_CHAT_ID=...
 ```
 
-Secrets live in the environment, never in the config file — the config only
-holds `ENV:TG_BOT_TOKEN` and `ENV:TG_CHAT_ID`. Sending is best-effort: a Telegram
+Secrets live in config.yaml, never in the environment — the config holds
+`notifications.telegram.botToken` and `notifications.telegram.chatId`. Sending is best-effort: a Telegram
 API error is logged and the monitor continues, because losing the monitor to a
 rate-limit response from an alert channel would be a self-inflicted outage.
 
