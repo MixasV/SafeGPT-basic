@@ -1,5 +1,5 @@
 import type { Address } from "viem";
-import { arbitrum, base, mainnet, sepolia } from "wagmi/chains";
+import { arbitrum, avalanche, avalancheFuji, base, mainnet, sepolia } from "wagmi/chains";
 
 import { WETH_ADDRESSES } from "./contracts";
 import { VERIFIED_TOKENS } from "./verified-tokens";
@@ -58,6 +58,8 @@ export const EXPLORER_URLS: Record<number, string> = {
   [sepolia.id]: "https://sepolia.etherscan.io",
   [base.id]: "https://basescan.org",
   [arbitrum.id]: "https://arbiscan.io",
+  [avalanche.id]: "https://snowtrace.io",
+  [avalancheFuji.id]: "https://subnets.avax.network/c-chain/fuji",
 };
 
 export function explorerTxUrl(chainId: number, hash: string): string {
@@ -77,6 +79,8 @@ export function chainName(chainId: number): string {
     [sepolia.id]: "Sepolia",
     [base.id]: "Base",
     [arbitrum.id]: "Arbitrum One",
+    [avalanche.id]: "Avalanche C-Chain",
+    [avalancheFuji.id]: "Avalanche Fuji (testnet)",
   };
   return names[chainId] ?? `chain ${chainId}`;
 }

@@ -1,7 +1,7 @@
 import { connectorsForWallets } from "@rainbow-me/rainbowkit";
 import { injectedWallet, metaMaskWallet, rabbyWallet, walletConnectWallet } from "@rainbow-me/rainbowkit/wallets";
 import { createConfig, http } from "wagmi";
-import { arbitrum, base, mainnet, sepolia } from "wagmi/chains";
+import { arbitrum, avalanche, avalancheFuji, base, mainnet, sepolia } from "wagmi/chains";
 
 import { SUPPORTED_CHAINS } from "./contracts";
 
@@ -34,6 +34,8 @@ const DEFAULT_RPC_URLS: Record<number, string> = {
   [sepolia.id]: "https://ethereum-sepolia.publicnode.com",
   [base.id]: "https://mainnet.base.org",
   [arbitrum.id]: "https://arb1.arbitrum.io/rpc",
+  [avalanche.id]: "https://api.avax.network/ext/bc/C/rpc",
+  [avalancheFuji.id]: "https://api.avax-test.network/ext/bc/C/rpc",
 };
 
 /** RPC endpoints per chain, overridable through VITE_RPC_URL_<chainId>. */

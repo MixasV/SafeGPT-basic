@@ -4,7 +4,7 @@ Three scenarios, and they are genuinely different:
 
 * **[A. Demo](#a-demo)** — no wallet, no ETH, no keys. Rehearse the whole flow.
 * **[B. Self-hosted on testnet](#b-self-hosted-on-testnet)** — the real thing,
-  on Sepolia.
+  on Sepolia or Avalanche Fuji (43113).
 * **[C. Publishing the frontend](#c-publishing-the-frontend)** — build it, and
   keep the keys out of the bundle.
 

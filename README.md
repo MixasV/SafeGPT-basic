@@ -89,10 +89,13 @@ repository yourself costs:
 ## Networks and assets
 
 **Chains wired into the interface:** Ethereum mainnet, Base, Arbitrum,
-Sepolia. The bot itself is chain-agnostic — it follows whatever `chainId` and
-RPC endpoints the config names.
+Avalanche C-Chain, Sepolia, Avalanche Fuji (testnet). The bot itself is
+chain-agnostic — it follows whatever `chainId` and RPC endpoints the config
+names. Avalanche is EVM, so the same RescueVault/Factory bytecode deploys
+unchanged; WAVAX (`0xB31f…F355`) is the wrapped native token on both
+Avalanche networks.
 
-**Verified tokens:** 27, in a static list
+**Verified tokens:** 33, in a static list
 (`web/src/config/verified-tokens.ts`). The list is a file, not a runtime API
 call, so the Core/Watch classification is reproducible between two runs.
 

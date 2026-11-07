@@ -1,5 +1,5 @@
 import type { Address } from "viem";
-import { arbitrum, base, mainnet, sepolia } from "viem/chains";
+import { arbitrum, avalanche, avalancheFuji, base, mainnet, sepolia } from "viem/chains";
 
 /**
  * Statically curated verified-token lists (specification section 6).
@@ -63,6 +63,19 @@ export const VERIFIED_TOKENS: Record<number, VerifiedTokenList> = {
     ["0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1", { symbol: "DAI", name: "Dai", decimals: 18 }],
     ["0x912CE59144191C1204E64559FE8253a0e49E6548", { symbol: "ARB", name: "Arbitrum", decimals: 18 }],
     ["0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f", { symbol: "WBTC", name: "Wrapped BTC", decimals: 8 }],
+  ]),
+
+  // ---------------------------------------------------------------- Avalanche
+  [avalanche.id]: list([
+    ["0xB31f66AA3C1e785363F0875A1B574E37E054F355", { symbol: "WAVAX", name: "Wrapped Avax", decimals: 18 }],
+    ["0x5425897298a101678434d19B749ea137EE9725b464", { symbol: "USDC", name: "USD Coin", decimals: 6 }],
+    ["0x9702230A8Ea53601f5cD2dc00f872c54d7d526113", { symbol: "USDT", name: "Tether USD", decimals: 6 }],
+    ["0x553D98B197CODF9E664731F829394BFd71999C08", { symbol: "WBTC", name: "Wrapped BTC", decimals: 8 }],
+    ["0x0A77230d17318075983913bC2145DB16C7366159", { symbol: "LINK", name: "Chainlink", decimals: 18 }],
+  ]),
+
+  [avalancheFuji.id]: list([
+    ["0xB31f66AA3C1e785363F0875A1B574E37E054F355", { symbol: "WAVAX", name: "Wrapped Avax", decimals: 18 }],
   ]),
 
   // ------------------------------------------------------------------ Sepolia

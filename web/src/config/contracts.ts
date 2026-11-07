@@ -1,5 +1,5 @@
 ﻿import type { Abi, Address, Hex } from "viem";
-import { arbitrum, base, mainnet, sepolia } from "wagmi/chains";
+import { arbitrum, avalanche, avalancheFuji, base, mainnet, sepolia } from "wagmi/chains";
 
 import artifacts from "./artifacts.json";
 
@@ -9,7 +9,7 @@ import artifacts from "./artifacts.json";
  * The list matches the wrapped-native addresses SafeGPT ships wrapping support
  * for, so "Wrap ETH → WETH" works everywhere the wizard runs.
  */
-export const SUPPORTED_CHAINS = [mainnet, base, arbitrum, sepolia] as const;
+export const SUPPORTED_CHAINS = [mainnet, base, arbitrum, avalanche, avalancheFuji, sepolia] as const;
 
 export type SupportedChainId = (typeof SUPPORTED_CHAINS)[number]["id"];
 
@@ -19,6 +19,8 @@ export const WETH_ADDRESSES: Record<number, Address> = {
   [sepolia.id]: "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
   [base.id]: "0x4200000000000000000000000000000000000006",
   [arbitrum.id]: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
+  [avalanche.id]: "0xB31f66AA3C1e785363F0875A1B574E37E054F355",
+  [avalancheFuji.id]: "0xB31f66AA3C1e785363F0875A1B574E37E054F355",
 };
 
 export function getWethAddress(chainId: number): Address | undefined {
