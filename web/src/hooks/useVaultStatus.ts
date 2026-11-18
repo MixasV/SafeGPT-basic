@@ -59,7 +59,10 @@ const INITIAL: Omit<VaultState, "refresh"> = {
   protectedWallet: undefined,
   safeAddress: undefined,
   vaultAddress: undefined,
-  chainId: 11155111,
+  // 0 = not yet known. The real chainId comes from the onboarding store /
+  // connected wallet on the first read. A hardcoded Sepolia here showed the
+  // wrong network on the dashboard for anyone not on Sepolia.
+  chainId: 0,
   isDemo: DEMO_MODE,
   isLoading: !DEMO_MODE,
   error: undefined,

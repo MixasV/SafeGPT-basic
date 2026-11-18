@@ -11,8 +11,8 @@ import type { AlertsConfig, BotConfig, TokenConfig, WalletConfig } from "./types
  * Two phases, deliberately separated:
  *   1. `loadConfig` — parse and shape-check, no network access. This is what
  *      `--dry-run` exercises, so an operator can validate a config offline.
- *   2. `validateAgainstChain` — confirm the chain id and, for Variant B, that
- *      the guardian on-chain matches the operator's expectation.
+ *   2. `validateAgainstChain` — confirm the chain id and that each vault really
+ *      points at the configured wallet and safe address.
  */
 
 export class ConfigError extends Error {
@@ -160,11 +160,6 @@ function parseWallet(value: unknown, index: number): WalletConfig {
   }
   const record = value as Record<string, unknown>;
 
-  const variant = requireString(record.variant, `${path}.variant`).toUpperCase();
-  if (variant !== "A" && variant !== "B") {
-    throw new ConfigError(`${path}.variant must be "A" (RescueVault) or "B" (GuardianModule), got "${variant}".`);
-  }
-
   const safeAddress = requireAddress(record.safeAddress, `${path}.safeAddress`);
   const protectedWallet = requireAddress(record.protectedWallet, `${path}.protectedWallet`);
 
@@ -222,26 +217,17 @@ function parseWallet(value: unknown, index: number): WalletConfig {
     protectedWallet,
     safeAddress,
     vaultAddress: requireAddress(record.vaultAddress, `${path}.vaultAddress`),
-    variant,
     coreTokens,
     watchTokens,
     whitelist: parseAddressList(record.whitelist, `${path}.whitelist`),
     thresholds: thresholdsConfig,
   };
 
-  if (variant === "A") {
-    const key = requireString(record.executorPrivateKey, `${path}.executorPrivateKey`);
-    if (!/^0x[0-9a-fA-F]{64}$/.test(key)) {
-      throw new ConfigError(`${path}.executorPrivateKey must be a 32-byte hex private key.`);
-    }
-    wallet.executorPrivateKey = key;
-  } else {
-    const key = requireString(record.guardianPrivateKey, `${path}.guardianPrivateKey`);
-    if (!/^0x[0-9a-fA-F]{64}$/.test(key)) {
-      throw new ConfigError(`${path}.guardianPrivateKey must be a 32-byte hex private key.`);
-    }
-    wallet.guardianPrivateKey = key;
+  const key = requireString(record.executorPrivateKey, `${path}.executorPrivateKey`);
+  if (!/^0x[0-9a-fA-F]{64}$/.test(key)) {
+    throw new ConfigError(`${path}.executorPrivateKey must be a 32-byte hex private key.`);
   }
+  wallet.executorPrivateKey = key;
 
   return wallet;
 }
@@ -280,10 +266,6 @@ export function loadConfig(path: string): BotConfig {
   if (!rpcHttp.startsWith("http://") && !rpcHttp.startsWith("https://")) {
     throw new ConfigError(`rpcHttp must be an http:// or https:// URL, got "${rpcHttp}".`);
   }
-
-  const rpcHttpFallbacks = Array.isArray(record.rpcHttpFallbacks)
-    ? record.rpcHttpFallbacks.map((v, i) => requireString(v, `rpcHttpFallbacks[${i}]`))
-    : [];
 
   if (!Array.isArray(record.wallets) || record.wallets.length === 0) {
     throw new ConfigError("wallets is required and must contain at least one entry.");
@@ -333,7 +315,6 @@ export function loadConfig(path: string): BotConfig {
   return {
     rpcWss,
     rpcHttp,
-    rpcHttpFallbacks,
     chainId: requireNumber(record.chainId, "chainId"),
     flashbotsRelay: optionalString(record.flashbotsRelay, "flashbotsRelay") ?? "",
     wallets,
@@ -380,16 +361,6 @@ export async function validateAgainstChain(config: BotConfig, provider: RpcReade
       );
     }
 
-    if (wallet.variant === "B") {
-      const guardian = await readAddress(provider, wallet.vaultAddress, SELECTORS.guardian);
-      // The guardian key is the whole point of Variant B, and its address cannot
-      // be derived from a private key without trying every signature — out of
-      // scope. The operator must confirm it themselves.
-      warnings.push(
-        `Wallet "${wallet.label}" uses Variant B. Verify separately that ${guardian} ` +
-          `is the guardian address derived from guardianPrivateKey — the bot cannot check a private key.`,
-      );
-    }
   }
 
   return warnings;

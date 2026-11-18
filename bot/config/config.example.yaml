@@ -4,7 +4,6 @@
 # startup, so private keys never live in this file:
 #
 #   export EXECUTOR_KEY=0x...
-#   export GUARDIAN_KEY=0x...
 #   npm run bot -- --config config.example.yaml --dry-run
 #
 # `ENV:NAME` (required) fails loudly if the variable is missing. `ENV_OPT:NAME`
@@ -23,9 +22,8 @@ wallets:
     protectedWallet: "0x1111111111111111111111111111111111111111"
     safeAddress: "0x2222222222222222222222222222222222222222"
     vaultAddress: "0x3333333333333333333333333333333333333333"
-    variant: "A" # A = RescueVault (bot as executor), B = GuardianModule (bot as guardian)
 
-    # Required for variant A. The address derived from this key must equal the
+    # The address derived from this key must equal the
     # vault's `executor`; the bot refuses to send a rescue otherwise.
     executorPrivateKey: "ENV:EXECUTOR_KEY"
 
@@ -52,9 +50,9 @@ wallets:
       massTransferWindowMin: 5 # …within 5 minutes
       balanceDropPct: 10 # a 10% balance drop post-block triggers a rescue
 
-# For variant B use this instead of executorPrivateKey:
-#     variant: "B"
-#     guardianPrivateKey: "ENV:GUARDIAN_KEY"
+# Variant B (GuardianModule) is a hosted-platform feature and is not supported
+# by the OSS bot. If configured, the bot reports VARIANT_B_UNSUPPORTED and sends
+# no rescue for that wallet. No guardian key is required or used.
 
 alerts:
   # Telegram is the PRIMARY channel — it is what reaches you at 3am. Both

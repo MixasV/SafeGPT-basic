@@ -5,9 +5,11 @@ import { evaluate } from "./rules.js";
 import type { Scanner } from "./scanner.js";
 import {
   createRuleState,
+  type Alert,
   type ObservedTransaction,
   type RescueReason,
   type RuleState,
+  type Verdict,
   type WalletConfig,
 } from "./types.js";
 
@@ -26,15 +28,6 @@ import {
  * wallet is how gas gets wasted.
  */
 
-/** The subset of an ethers provider the monitor uses. */
-export interface MonitorProvider extends RpcReader {
-  on(event: "pending", listener: (hash: string) => void): unknown;
-  on(event: "block", listener: (blockNumber: bigint) => void): unknown;
-  on(event: "error", listener: (error: unknown) => void): unknown;
-  getTransaction(hash: string): Promise<RawTransaction | null>;
-  destroy(): void;
-}
-
 /**
  * A transaction as ethers v6 returns it. Structural rather than
  * `TransactionResponse` so tests can supply a plain object.
@@ -50,6 +43,11 @@ export interface RawTransaction {
   // this type under exactOptionalPropertyTypes.
   authorizationList?: readonly unknown[] | null | undefined;
   blockNumber?: number | null | undefined;
+  /** EIP-1559 fee fields, present on type-2 transactions. */
+  maxFeePerGas?: bigint | null | undefined;
+  maxPriorityFeePerGas?: bigint | null | undefined;
+  /** Legacy gas price, present on type-0 transactions. */
+  gasPrice?: bigint | null | undefined;
 }
 
 export const DEFAULT_RECONNECT_DELAY_MS = 3_000;
@@ -57,14 +55,40 @@ export const DEFAULT_MAX_RECONNECT_ATTEMPTS = 10;
 
 /**
  * How long a connection may stay silent before it is treated as dead. Chains
- * emit a block every ~12s, so four minutes of silence means the socket is gone
- * even if no transport-level error was raised.
+ * emit a block every ~12s, so even a testnet with a quiet mempool produces
+ * `block` events regularly; a connection that truly stops delivering them is
+ * gone. Five minutes tolerates brief RPC hiccups without declaring the socket
+ * dead prematurely.
  */
-export const HEARTBEAT_MS = 90_000;
+export const HEARTBEAT_MS = 300_000;
 
 /** Anything that can carry out a rescue. `Executor` satisfies this structurally. */
 export interface Rescuer {
   rescue(wallet: WalletConfig, reason: RescueReason, tokens?: string[]): Promise<RescueOutcome>;
+}
+
+/**
+ * The provider the monitor talks to.
+ *
+ * The `pending` event carries the **full transaction object**, not just a hash:
+ * Alchemy's `alchemy_pendingTransactions` subscription (with `hashesOnly: false`)
+ * pushes the same shape `eth_getTransactionByHash` would return, so the monitor
+ * never needs to make a per-hash RPC call. A plain `newPendingTransactions`
+ * feed (ethers `WebSocketProvider`) pushes only hashes and requires a follow-up
+ * `getTransaction` per hash — that is 20 CU × every pending tx on the chain,
+ * which is what burned through the Alchemy quota.
+ *
+ * For backward compatibility, if `getTransaction` is called with a hash, the
+ * provider resolves it — the monitor tries the full-object path first and
+ * falls back to `getTransaction` only for providers that push hashes.
+ */
+export interface MonitorProvider extends RpcReader {
+  on(event: "pending", listener: (tx: RawTransaction) => void): unknown;
+  on(event: "block", listener: (blockNumber: bigint) => void): unknown;
+  on(event: "error", listener: (error: unknown) => void): unknown;
+  /** Kept for backward compatibility; the monitor calls this only for hash-only feeds. */
+  getTransaction(hash: string): Promise<RawTransaction | null>;
+  destroy(): void;
 }
 
 export interface MonitorOptions {
@@ -168,9 +192,24 @@ export class Monitor {
   /** One connected lifetime: subscribe, then wait for a transport failure or an abort. */
   private session(provider: MonitorProvider, signal: AbortSignal): Promise<void> {
     return new Promise<void>((resolve, reject) => {
+      let heartbeat: NodeJS.Timeout | undefined;
+
+      const resetHeartbeat = (): void => {
+        if (heartbeat !== undefined) clearTimeout(heartbeat);
+        // The socket can die without an `error` event on some transports, so a
+        // liveness probe backstops the provider's own error reporting. Reset on
+        // every event: a quiet mempool (testnet) must not be mistaken for a dead
+        // socket, but true silence past the timeout still triggers reconnect.
+        heartbeat = setTimeout(() => {
+          cleanup();
+          reject(new Error("WebSocket produced no events and the connection is presumed dead."));
+        }, HEARTBEAT_MS);
+        heartbeat.unref();
+      };
+
       const cleanup = (): void => {
         signal.removeEventListener("abort", onAbort);
-        clearTimeout(heartbeat);
+        if (heartbeat !== undefined) clearTimeout(heartbeat);
       };
 
       const onAbort = (): void => {
@@ -178,19 +217,14 @@ export class Monitor {
         resolve();
       };
 
-      // The socket can die without an `error` event on some transports, so a
-      // liveness probe backstops the provider's own error reporting.
-      const heartbeat = setTimeout(() => {
-        cleanup();
-        reject(new Error("WebSocket produced no events and the connection is presumed dead."));
-      }, HEARTBEAT_MS);
-      // Never hold the process open just to detect a dead socket.
-      heartbeat.unref();
+      resetHeartbeat();
 
-      provider.on("pending", (hash) => {
-        void this.handlePending(provider, hash);
+      provider.on("pending", (tx) => {
+        resetHeartbeat();
+        void this.handlePending(provider, tx);
       });
       provider.on("block", (blockNumber) => {
+        resetHeartbeat();
         void this.handleBlock(blockNumber);
       });
       provider.on("error", (error) => {
@@ -203,17 +237,34 @@ export class Monitor {
     });
   }
 
-  /** Fetches a pending transaction and runs it past every wallet's rules. */
-  private async handlePending(provider: MonitorProvider, hash: string): Promise<void> {
+  /**
+   * Runs the rules engine against a pending transaction.
+   *
+   * The full transaction is pushed by the provider (Alchemy's
+   * `alchemy_pendingTransactions` with `hashesOnly: false`), so there is no
+   * `eth_getTransactionByHash` call here. For providers that push only hashes
+   * (standard `newPendingTransactions`), the caller must resolve the full
+   * object before passing it here — the monitor handles both shapes: if the
+   * listener receives a string, it is treated as a hash and resolved via
+   * `getTransaction`.
+   */
+  private async handlePending(provider: MonitorProvider, rawOrHash: RawTransaction | string): Promise<void> {
     let raw: RawTransaction | null;
-    try {
-      raw = await provider.getTransaction(hash);
-    } catch (error) {
-      // A transaction disappearing between notification and fetch is routine.
-      this.log(`Could not fetch pending ${hash}: ${(error as Error).message}`);
-      return;
+
+    if (typeof rawOrHash === "string") {
+      // Hash-only feed (standard ethers WebSocketProvider).
+      // The provider wrapper is expected to resolve the hash before calling us;
+      // if it arrives here as a string, fetch it.
+      try {
+        raw = await provider.getTransaction(rawOrHash);
+      } catch (error) {
+        this.log(`Could not fetch pending ${rawOrHash}: ${(error as Error).message}`);
+        return;
+      }
+      if (raw === null) return;
+    } else {
+      raw = rawOrHash;
     }
-    if (raw === null) return;
 
     const tx = normalizeTransaction(raw);
     if (tx === null) return;
@@ -222,26 +273,87 @@ export class Monitor {
       const verdict = evaluate(tx, wallet, this.stateFor(wallet), this.now());
       if (verdict.action === "IGNORE") continue;
 
-      const alert = buildAlert({
-        wallet: wallet.label,
-        rule: verdict.rule,
-        severity: verdict.severity,
-        reason: verdict.reason,
-        action: verdict.action,
-        txHash: tx.hash,
-        now: this.now(),
-      });
-      await this.safeAlert(alert);
-
-      if (verdict.action === "RESCUE") {
-        await this.dispatch(wallet, {
-          rule: verdict.rule,
-          reason: verdict.reason,
-          severity: verdict.severity,
-          txHash: tx.hash,
-        });
+      if (verdict.action !== "RESCUE") {
+        await this.safeAlert(
+          buildAlert({
+            wallet: wallet.label,
+            kind: "alert",
+            rule: verdict.rule,
+            severity: verdict.severity,
+            reason: verdict.reason,
+            action: verdict.action,
+            txHash: tx.hash,
+            now: this.now(),
+          }),
+        );
+        continue;
       }
+
+      // The attacker's priority fee (or legacy gas price) is forwarded so the
+      // executor can bid higher and land its rescue BEFORE the attack in the
+      // same block. Without this the rescue uses the network's default fee,
+      // which on a quiet chain is far below the attacker's bid.
+      const attackerPriorityFee = raw.maxPriorityFeePerGas ?? raw.gasPrice ?? undefined;
+      const outcome = await this.dispatch(wallet, {
+        rule: verdict.rule,
+        reason: verdict.reason,
+        severity: verdict.severity,
+        txHash: tx.hash,
+        attackerPriorityFee,
+      });
+
+      // Sent AFTER the rescue, not before: the alert has to name the rescue
+      // transaction and the amounts that actually moved. Alerting first would
+      // put the ATTACK hash on the event and leave the rescue unrecorded.
+      await this.safeAlert(this.rescueAlert(wallet, verdict, tx.hash, outcome));
     }
+  }
+
+  /**
+   * Builds the alert for a rescue attempt.
+   *
+   * On success `txHash` is the RESCUE transaction and `rescue` carries the
+   * per-token amounts the vault reported. On failure there is no rescue
+   * transaction at all, so the alert carries no hash — a link to the attack
+   * would read as if the rescue had happened.
+   */
+  private rescueAlert(
+    wallet: WalletConfig,
+    verdict: Verdict,
+    attackTxHash: string | undefined,
+    outcome: RescueOutcome,
+  ): Alert {
+    const base = {
+      wallet: wallet.label,
+      rule: verdict.rule,
+      severity: verdict.severity,
+      reason: verdict.reason,
+      // Only ever called for a RESCUE verdict; `IGNORE` never reaches an alert.
+      action: "RESCUE" as const,
+      now: this.now(),
+    };
+
+    if (outcome.status === "SENT" && outcome.txHashes.length > 0) {
+      const txHash = outcome.txHashes[0]!;
+      return buildAlert({
+        ...base,
+        kind: "rescue",
+        txHash,
+        rescue: {
+          txHash,
+          ...(attackTxHash === undefined ? {} : { attackerTxHash: attackTxHash }),
+          rescued: outcome.rescued,
+        },
+      });
+    }
+
+    const reason = outcome.status === "SKIPPED" || outcome.status === "VARIANT_B_UNSUPPORTED" ? outcome.reason : undefined;
+
+    return buildAlert({
+      ...base,
+      kind: "alert",
+      ...(reason === undefined ? {} : { error: reason }),
+    });
   }
 
   /** Runs the post-block scanner across every wallet. */
@@ -249,9 +361,27 @@ export class Monitor {
     for (const wallet of this.options.wallets) {
       try {
         for (const finding of await this.options.scanner.scan(wallet, blockNumber)) {
+          const verdict: Verdict = {
+            action: finding.action,
+            rule: finding.rule,
+            reason: finding.reason,
+            severity: finding.severity,
+          };
+
+          if (verdict.action === "RESCUE" && finding.tokens.length > 0) {
+            const outcome = await this.dispatch(
+              wallet,
+              { rule: finding.rule, reason: finding.reason, severity: finding.severity },
+              finding.tokens,
+            );
+            await this.safeAlert(this.rescueAlert(wallet, verdict, undefined, outcome));
+            continue;
+          }
+
           await this.safeAlert(
             buildAlert({
               wallet: wallet.label,
+              kind: "alert",
               rule: finding.rule,
               severity: finding.severity,
               reason: finding.reason,
@@ -259,14 +389,6 @@ export class Monitor {
               now: this.now(),
             }),
           );
-
-          if (finding.action === "RESCUE" && finding.tokens.length > 0) {
-            await this.dispatch(
-              wallet,
-              { rule: finding.rule, reason: finding.reason, severity: finding.severity },
-              finding.tokens,
-            );
-          }
         }
       } catch (error) {
         // One wallet failing to read must not stop the others being checked.
@@ -289,18 +411,6 @@ export class Monitor {
     } catch (error) {
       const message = (error as Error).message;
       this.log(`Rescue failed for ${wallet.label}: ${message}`);
-      await this.safeAlert(
-        buildAlert({
-          wallet: wallet.label,
-          rule: reason.rule,
-          severity: reason.severity,
-          reason: reason.reason,
-          action: "RESCUE",
-          txHash: reason.txHash,
-          error: message,
-          now: this.now(),
-        }),
-      );
       return { status: "SKIPPED", reason: message };
     }
   }
@@ -313,7 +423,7 @@ export class Monitor {
       case "DRY_RUN":
         this.log(`[${wallet.label}] dry run, nothing sent: ${outcome.planned.join(" | ")}`);
         break;
-      case "GUARDIAN_MODULE_UNSUPPORTED":
+      case "VARIANT_B_UNSUPPORTED":
       case "SKIPPED":
         this.log(`[${wallet.label}] rescue not sent — ${outcome.reason}`);
         break;
@@ -331,7 +441,15 @@ export class Monitor {
 
   private async alertSystem(reason: string): Promise<void> {
     await this.safeAlert(
-      buildAlert({ wallet: "system", rule: "NONE", severity: "CRITICAL", reason, action: "ALERT", now: this.now() }),
+      buildAlert({
+        wallet: "system",
+        kind: "alert",
+        rule: "NONE",
+        severity: "CRITICAL",
+        reason,
+        action: "ALERT",
+        now: this.now(),
+      }),
     );
   }
 

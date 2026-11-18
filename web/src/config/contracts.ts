@@ -27,8 +27,24 @@ export function getWethAddress(chainId: number): Address | undefined {
   return WETH_ADDRESSES[chainId];
 }
 
-/** Service fee charged by the vault, in basis points. 500 = 5%. */
-export const DEFAULT_FEE_BPS = 500;
+/**
+ * Service fee charged by the vault, in basis points. 300 = 3%.
+ *
+ * The default fee goes to the SafeGPT developer address. Users can set it
+ * to 0 in the onboarding wizard to disable the fee entirely.
+ * The contract caps it at MAX_FEE_BPS (1000 = 10%).
+ */
+export const DEFAULT_FEE_BPS = 300;
+
+/**
+ * Default fee receiver — SafeGPT developer address.
+ * Users can change this in settings, but it defaults to the developer.
+ * TODO: Replace with the actual developer address.
+ * Using a burn address as placeholder — the contract rejects zero address,
+ * but accepts any non-zero address. The user will set the real address in
+ * the onboarding wizard before deploying.
+ */
+export const DEFAULT_FEE_RECEIVER: Address = "0x4f7e26af0bc2b078802763fa0ee4cebbe8afbbbb";
 
 export const rescueVaultAbi = artifacts.rescueVault.abi as Abi;
 export const rescueVaultBytecode = artifacts.rescueVault.bytecode as Hex;

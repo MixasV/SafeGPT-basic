@@ -241,19 +241,44 @@ export class ChainGPTClient {
     }
   }
 
-  // --- Chatbot ---
+  // --- Auditor ---
 
-  /** Configuration review shown on the final wizard screen. */
-  async reviewConfiguration(configJson: string): Promise<ChainGPTResult<ChatResult>> {
+  /**
+   * Pre-deploy audit of the user's exact deployment manifest.
+   *
+   * Uses the same model as `audit()` (smart_contract_auditor): the manifest is
+   * the actual configuration the vault will be deployed with, so it is audited
+   * as a contract deployment, not chatted about. The model returns a markdown
+   * verdict the UI renders verbatim.
+   */
+  async reviewConfiguration(manifest: string): Promise<ChainGPTResult<ChatResult>> {
     const question =
-      `Analyze this SafeGPT wallet protection configuration and give security recommendations:\n\n` +
-      `${configJson}\n\n` +
-      `Respond in 3-5 bullet points. Cover: gaps in token coverage, rescue threshold ` +
-      `recommendations, whitelist completeness, and general security posture. Do not give financial advice.`;
+      `You are auditing a SafeGPT RescueVault deployment manifest. Review THIS specific ` +
+      `deployment instance (factory params, constructor args, withdrawDelay, salt, selected ` +
+      `tokens and whitelist) for mistakes that would make a rescue fail or send funds to the ` +
+      `wrong place.\n\n${manifest}\n\n` +
+      `Give a clear verdict on its own line: SAFE TO APPROVE / REVIEW REQUIRED / DO NOT APPROVE. ` +
+      `Then list concrete findings and fixes. No financial advice.`;
 
     return this.request(
-      "general_assistant",
+      "smart_contract_auditor",
       question,
+      { markdown: MOCK_ONBOARDING_REVIEW },
+      (markdown) => ({ markdown }),
+    );
+  }
+
+  /**
+   * Audits the EXACT deployment manifest — the final contract code and config
+   * that will be deployed on-chain. This is not a template audit: it reviews
+   * the user's specific owner, safe address, executor, fee, tokens, and
+   * whitelist for mistakes that would make rescue fail or funds go to the
+   * wrong place.
+   */
+  async reviewDeployment(manifest: string): Promise<ChainGPTResult<AuditResult>> {
+    return this.request(
+      "smart_contract_auditor",
+      manifest,
       { markdown: MOCK_ONBOARDING_REVIEW },
       (markdown) => ({ markdown }),
     );

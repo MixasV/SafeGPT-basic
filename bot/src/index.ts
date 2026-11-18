@@ -2,39 +2,24 @@ import { config as loadDotenv } from "dotenv";
 import { JsonRpcProvider, Signer, Wallet, WebSocketProvider } from "ethers";
 import { join } from "node:path";
 
-import { CompositeAlerter, ConsoleAlerter, WebhookAlerter, buildAlert, type AlertSink } from "./alerts.js";
+import {
+  BackendAlerter,
+  CompositeAlerter,
+  ConsoleAlerter,
+  TelegramAlerter,
+  WebhookAlerter,
+  buildAlert,
+  type AlertSink,
+} from "./alerts.js";
+import { AlchemyMonitorProvider } from "./alchemy-pending.js";
 import { ConfigError, loadConfig, validateAgainstChain } from "./config.js";
-import { Executor, type ExecutorSigner, type RescueOutcome } from "./executor.js";
-import { Monitor, ReconnectExhaustedError, type MonitorProvider, type Rescuer } from "./monitor.js";
+import { Executor, type ExecutorSigner } from "./executor.js";
+import { Monitor, ReconnectExhaustedError, type MonitorProvider, type RawTransaction, type Rescuer } from "./monitor.js";
 import { Scanner } from "./scanner.js";
-import { TELEGRAM_SETUP_HINT, TelegramAlerter } from "./telegram.js";
-import type { BotConfig, RescueReason, WalletConfig } from "./types.js";
+import type { BotConfig, WalletConfig } from "./types.js";
 
 /**
- * Loads the environment file.
- *
- * ONE FILE PER PROJECT
- * --------------------
- * The `.env` belongs to THIS PROJECT and travels with it. A user who copies
- * `safegpt-core` onto their own machine must get a working bot with the same
- * two steps — copy the folder, put the keys in `.env` — and nothing may
- * depend on a file outside the project, or on the directory the process
- * happens to be started from.
- *
- * So there is exactly one file: `<project>/.env`, next to the README. The
- * bot, the web interface and the contracts tooling all share it. Searching
- * through sub-directories to find where a key goes is the wrong interface.
- *
- * The path is derived from this module's own location, so it does not depend
- * on the working directory.
- */
-function loadEnvironment(): void {
-  const projectRoot = join(import.meta.dirname, "..", "..");
-  loadDotenv({ path: join(projectRoot, ".env"), override: false, quiet: true });
-}
-
-/**
- * Entry point.
+ * Entry point for the SafeGPT self-hosted rescue bot.
  *
  *   npm run bot -- --config config/config.yaml --dry-run
  *
@@ -96,19 +81,53 @@ Options:
 Environment:
   Any config value written as ENV:NAME is replaced with the NAME environment
   variable. This is how private keys are supplied — never put one in the file.
+  Set ALCHEMY_API_KEY to enable Alchemy's filtered pending-transaction feed
+  (requires a paid plan); without it the bot uses the standard pending feed.
+  Set PLATFORM_API_URL (+ BOT_API_KEY, WEBHOOK_SECRET) to also forward alerts
+  to a SafeGPT platform backend.
 `);
 }
 
-/** Bridges an ethers provider to the narrow interfaces the bot depends on. */
-function asMonitorProvider(provider: WebSocketProvider): MonitorProvider {
-  return {
-    send: (method, params) => provider.send(method, params),
-    // ethers dispatches by event name; the cast keeps our narrower listener
-    // types from leaking into ethers' generic ones.
-    on: (event, listener) => provider.on(event, listener as never),
-    getTransaction: (hash) => provider.getTransaction(hash) as never,
-    destroy: () => provider.destroy(),
-  } as MonitorProvider;
+/**
+ * Loads the environment file.
+ *
+ * ONE FILE PER PROJECT
+ * --------------------
+ * The `.env` belongs to THIS PROJECT and travels with it. A user who copies
+ * `safegpt-core` onto their own machine must get a working bot with the same
+ * two steps — copy the folder, put the keys in `.env` — and nothing may
+ * depend on a file outside the project, or on the directory the process
+ * happens to be started from.
+ *
+ * The path is derived from this module's own location, so it does not depend
+ * on the working directory.
+ */
+function loadEnvironment(): void {
+  const projectRoot = join(import.meta.dirname, "..", "..");
+  loadDotenv({ path: join(projectRoot, ".env"), override: false, quiet: true });
+}
+
+/** Alchemy network slugs, keyed by chain id. Used to build a WSS URL from ALCHEMY_API_KEY. */
+const ALCHEMY_WSS_SLUGS: Record<number, string> = {
+  1: "eth-mainnet",
+  11155111: "eth-sepolia",
+  137: "polygon-mainnet",
+  80002: "polygon-amoy",
+  8453: "base-mainnet",
+  84532: "base-sepolia",
+  42161: "arb-mainnet",
+  421614: "arb-sepolia",
+  10: "opt-mainnet",
+  11155420: "opt-sepolia",
+  43114: "avax-mainnet",
+  43113: "avax-fuji",
+};
+
+/** Builds the Alchemy WSS endpoint for a chain, or undefined when the chain is unknown. */
+function alchemyWssUrl(chainId: number, apiKey: string): string | undefined {
+  const slug = ALCHEMY_WSS_SLUGS[chainId];
+  if (slug === undefined) return undefined;
+  return `wss://${slug}.g.alchemy.com/v2/${apiKey}`;
 }
 
 /**
@@ -132,14 +151,18 @@ function asExecutorSigner(signer: Signer, provider: JsonRpcProvider, address: st
 }
 
 /**
- * Builds the signer for a wallet. RescueVault mode needs the executor key
- * because the vault only accepts `rescue()` from the authorised executor;
- * GuardianModule's guardian key is loaded but unused in this release.
+ * Builds the signer for a wallet.
+ *
+ * RescueVault mode (variant A) needs the executor key because the vault only
+ * accepts `rescue()` from the authorised executor. Variant B (GuardianModule)
+ * is a hosted-platform feature: the executor short-circuits it to
+ * VARIANT_B_UNSUPPORTED before any signer call, so a stub is returned that
+ * throws loudly if anything ever does try to use it.
  */
 async function signerFor(wallet: WalletConfig, provider: JsonRpcProvider): Promise<ExecutorSigner> {
-  const key = wallet.variant === "A" ? wallet.executorPrivateKey : wallet.guardianPrivateKey;
+  const key = wallet.executorPrivateKey;
   if (key === undefined) {
-    throw new ConfigError(`Wallet "${wallet.label}" has no signing key for the configured contract mode (${wallet.variant}).`);
+    throw new ConfigError(`Wallet "${wallet.label}" has no executor private key configured.`);
   }
   // `new Wallet`, not `provider.getSigner(...)`. In ethers v6 `getSigner` takes
   // the address of an account the NODE holds, and passes the value straight to
@@ -149,29 +172,173 @@ async function signerFor(wallet: WalletConfig, provider: JsonRpcProvider): Promi
   return asExecutorSigner(signer, provider, await signer.getAddress());
 }
 
-function buildAlerter(alerts: BotConfig["alerts"], log: (message: string) => void): AlertSink {
+/**
+ * Builds the alert fan-out.
+ *
+ * The console is always present and always last — it is the durable record when
+ * every network channel is down. Telegram, webhook and (optionally) the platform
+ * backend are layered on top when configured. A missing or failing channel must
+ * never stop the console, so the composite swallows per-sink errors.
+ */
+function buildAlerter(config: BotConfig, log: (message: string) => void): AlertSink {
   const sinks: AlertSink[] = [];
 
-  // Telegram first: it is the channel that reaches the operator at 3am.
-  const telegram = new TelegramAlerter({ botToken: alerts.telegramBotToken, chatId: alerts.telegramChatId });
-  if (telegram.isConfigured()) {
-    sinks.push({ deliver: async (alert) => void (await telegram.send(alert)) });
+  const telegramToken = config.alerts.telegramBotToken;
+  const telegramChatId = config.alerts.telegramChatId;
+  if (telegramToken !== "" && telegramChatId !== "") {
+    sinks.push(
+      new TelegramAlerter({
+        token: telegramToken,
+        getChatId: () => telegramChatId,
+        onError: (message) => log(`[telegram] ${message}`),
+      }),
+    );
     log("Alerts: Telegram enabled.");
-  } else {
-    log(`Alerts: Telegram disabled. ${TELEGRAM_SETUP_HINT}`);
   }
 
-  if (alerts.webhookUrl !== "") {
-    sinks.push(new WebhookAlerter(alerts.webhookUrl));
+  if (config.alerts.webhookUrl !== "") {
+    sinks.push(new WebhookAlerter(config.alerts.webhookUrl, 5_000, (message) => log(message)));
     log("Alerts: webhook enabled.");
   }
 
-  // The console is always last and always present: it is the durable record
-  // when every network channel is down.
+  // Opt-in platform backend: only when the operator points the bot at a
+  // SafeGPT platform. Keys come from the environment, never from config.yaml.
+  const platformUrl = process.env.PLATFORM_API_URL ?? "";
+  const platformKey = process.env.BOT_API_KEY ?? "";
+  const webhookSecret = process.env.WEBHOOK_SECRET ?? "";
+  if (platformUrl !== "" && platformKey !== "" && webhookSecret !== "") {
+    sinks.push(
+      new BackendAlerter({
+        baseUrl: platformUrl,
+        apiKey: platformKey,
+        secret: webhookSecret,
+        onError: (message) => log(`[backend] ${message}`),
+      }),
+    );
+    log(`Alerts: platform backend enabled (${platformUrl}).`);
+  }
+
   sinks.push(new ConsoleAlerter());
-  return new CompositeAlerter(sinks, (error) => {
-    console.error(`[bot] alert delivery failed: ${(error as Error).message}`);
+  return new CompositeAlerter(sinks, (message) => {
+    console.error(`[bot] ${message}`);
   });
+}
+
+/**
+ * A WebSocket monitor provider that turns a hash-only pending feed into full
+ * transactions.
+ *
+ * WHY THIS EXISTS
+ * ---------------
+ * The monitor now expects the provider to push a full transaction object (the
+ * shape Alchemy's `alchemy_pendingTransactions` with `hashesOnly: false`
+ * produces). A plain ethers `WebSocketProvider` only pushes pending-tx hashes,
+ * so this adapter subscribes to `newPendingTransactions`, fetches each hash
+ * with `eth_getTransactionByHash`, and re-emits it as a `RawTransaction`. It is
+ * the standard-feed fallback used when no Alchemy key is configured.
+ */
+class WsPendingProvider implements MonitorProvider {
+  private readonly ws: WebSocketProvider;
+  private pending: ((tx: RawTransaction) => void) | null = null;
+  private block: ((blockNumber: bigint) => void) | null = null;
+  private error: ((error: unknown) => void) | null = null;
+  private readonly seen = new Set<string>();
+
+  constructor(
+    wsUrl: string,
+    private readonly reader: { send(method: string, params: unknown[]): Promise<unknown> },
+  ) {
+    this.ws = new WebSocketProvider(wsUrl, undefined, { staticNetwork: true });
+    void this.ws.on("pending", (hash: unknown) => {
+      void this.onPending(String(hash));
+    });
+    void this.ws.on("block", (blockNumber: unknown) => {
+      this.block?.(BigInt(blockNumber as number));
+    });
+    void this.ws.on("error", (error: unknown) => {
+      this.error?.(error);
+    });
+  }
+
+  private async onPending(hash: string): Promise<void> {
+    // A hash can be re-announced before it is mined; dedupe to avoid refetching.
+    if (this.seen.has(hash)) return;
+    this.seen.add(hash);
+    if (this.seen.size > 10_000) {
+      // Bound the cache so a long-running bot on a busy chain does not grow it
+      // without limit. The oldest entries are the ones most likely already mined.
+      const first = this.seen.values().next();
+      if (!first.done) this.seen.delete(first.value);
+    }
+    try {
+      const raw = (await this.reader.send("eth_getTransactionByHash", [hash])) as Record<string, unknown> | null;
+      if (raw !== null && raw !== undefined) this.pending?.(parseRawTransaction(raw));
+    } catch {
+      // A transaction disappearing between notification and fetch is routine.
+    }
+  }
+
+  on(event: "pending", listener: (tx: RawTransaction) => void): this;
+  on(event: "block", listener: (blockNumber: bigint) => void): this;
+  on(event: "error", listener: (error: unknown) => void): this;
+  on(
+    event: "pending" | "block" | "error",
+    listener: ((tx: RawTransaction) => void) | ((blockNumber: bigint) => void) | ((error: unknown) => void),
+  ): this {
+    if (event === "pending") this.pending = listener as (tx: RawTransaction) => void;
+    else if (event === "block") this.block = listener as (blockNumber: bigint) => void;
+    else this.error = listener as (error: unknown) => void;
+    return this;
+  }
+
+  async send(method: string, params: unknown[]): Promise<unknown> {
+    return this.reader.send(method, params);
+  }
+
+  async getTransaction(hash: string): Promise<RawTransaction | null> {
+    const raw = (await this.reader.send("eth_getTransactionByHash", [hash])) as Record<string, unknown> | null;
+    if (raw === null) return null;
+    return parseRawTransaction(raw);
+  }
+
+  destroy(): void {
+    this.ws.destroy();
+    this.pending = null;
+    this.block = null;
+    this.error = null;
+  }
+}
+
+/** Converts a raw JSON-RPC transaction object into the bot's `RawTransaction`. */
+function parseRawTransaction(raw: Record<string, unknown>): RawTransaction {
+  return {
+    hash: raw.hash as string,
+    from: raw.from as string,
+    to: raw.to == null ? null : (raw.to as string),
+    data: (raw.input ?? raw.data ?? "0x") as string,
+    value: BigInt((raw.value as string) ?? "0x0"),
+    type: raw.type !== undefined ? Number.parseInt(raw.type as string, 16) : null,
+    blockNumber: null,
+    maxFeePerGas: raw.maxFeePerGas !== undefined ? BigInt(raw.maxFeePerGas as string) : null,
+    maxPriorityFeePerGas:
+      raw.maxPriorityFeePerGas !== undefined ? BigInt(raw.maxPriorityFeePerGas as string) : null,
+    gasPrice: raw.gasPrice !== undefined ? BigInt(raw.gasPrice as string) : null,
+  };
+}
+
+/** Builds the per-attempt provider factory for one wallet. */
+function createProviderFactory(
+  config: BotConfig,
+  reader: JsonRpcProvider,
+  protectedWallet: string,
+  alchemyKey: string,
+): () => MonitorProvider {
+  const alchemyUrl = alchemyKey !== "" ? alchemyWssUrl(config.chainId, alchemyKey) : undefined;
+  if (alchemyUrl !== undefined) {
+    return () =>
+      new AlchemyMonitorProvider(alchemyUrl, reader, protectedWallet) as unknown as MonitorProvider;
+  }
+  return () => new WsPendingProvider(config.rpcWss, reader);
 }
 
 async function main(): Promise<void> {
@@ -183,15 +350,27 @@ async function main(): Promise<void> {
   const log = (message: string): void => console.log(`[bot] ${message}`);
 
   log(`Loaded ${config.wallets.length} wallet(s) for chain ${config.chainId}.`);
+  if (config.flashbotsRelay !== "") {
+    log("flashbotsRelay is set — rescues will try the private relay first, then fall back to the public mempool.");
+  }
   if (options.dryRun) {
     log("DRY RUN — rescues will be planned and logged, never broadcast.");
   }
 
+  const alchemyKey = (process.env.ALCHEMY_API_KEY ?? "").trim();
+  if (alchemyKey !== "") {
+    const url = alchemyWssUrl(config.chainId, alchemyKey);
+    log(url === undefined
+      ? `ALCHEMY_API_KEY is set but chain ${config.chainId} has no Alchemy slug — using the standard pending feed.`
+      : "Alchemy pending-transaction feed enabled (filtered by protected wallet).");
+  } else {
+    log("ALCHEMY_API_KEY not set — using the standard pending feed (hash + eth_getTransactionByHash).");
+  }
+
   // The alert channels are reported before the first network call. An operator
   // who just added a Telegram token wants to know straight away whether it was
-  // picked up — and the chain check below can fail first, in which case they
-  // would never see the answer and would conclude the key is wrong.
-  const alerter = buildAlerter(config.alerts, log);
+  // picked up — and the chain check below can fail first.
+  const alerter = buildAlerter(config, log);
 
   // 2. Verify the node before trusting anything it says.
   const http = new JsonRpcProvider(config.rpcHttp, undefined, { staticNetwork: true });
@@ -201,8 +380,7 @@ async function main(): Promise<void> {
   } catch (error) {
     // Destroy the provider before bailing out. An ethers provider that cannot
     // reach the node keeps a "detect network" retry timer alive, and that timer
-    // holds the event loop open: the process would sit there forever instead of
-    // exiting with the error the operator needs to see.
+    // holds the event loop open: the process would sit there forever.
     http.destroy();
     if (error instanceof ConfigError) {
       console.error(`[bot] configuration does not match the chain: ${error.message}`);
@@ -212,54 +390,10 @@ async function main(): Promise<void> {
     throw error;
   }
 
-  const ws = new WebSocketProvider(config.rpcWss, undefined, { staticNetwork: true });
   // The scanner holds its baseline across blocks, so it must outlive any single
-  // connection. It reads through a factory rather than a captured provider so
-  // that a reconnect does not leave it pointing at a destroyed socket.
-  const executorByWallet = new Map<string, Executor>();
-  const scanner = new Scanner(() => ws);
-
+  // connection. It reads through a factory rather than a captured provider.
+  const scanner = new Scanner(() => http);
   const minExecutorEth = BigInt(Math.round(config.alerts.minExecutorEth * 1e18));
-
-  const executorAddresses: string[] = [];
-  const executors = await Promise.all(
-    config.wallets.map(async (wallet) => {
-      const signer = await signerFor(wallet, http);
-      const executor = new Executor(signer, http, {
-        dryRun: options.dryRun,
-        minExecutorEth,
-        maxGasPriceGwei: 0n,
-        log,
-      });
-      executorAddresses.push(await signer.getAddress());
-      executorByWallet.set(wallet.label, executor);
-      return { wallet, executor };
-    }),
-  );
-
-  if (options.dryRun) {
-    // Confirm the signer really is the vault's executor before going live, so a
-    // dry run catches the mistake that would otherwise waste a real rescue.
-    for (const { wallet, executor } of executors) {
-      const outcome = await executor.rescue(wallet, {
-        rule: "NONE",
-        reason: "startup pre-flight",
-        severity: "MEDIUM",
-      });
-      log(`pre-flight for "${wallet.label}": ${outcome.status}`);
-    }
-  }
-
-  const monitor = new Monitor({
-    createProvider: () => asMonitorProvider(new WebSocketProvider(config.rpcWss, undefined, { staticNetwork: true })),
-    wallets: config.wallets,
-    // Every wallet is protected by its own vault, so a shared executor must know
-    // which vault it is acting for. Wrap the map in a dispatcher.
-    executor: new DispatchingExecutor(executorByWallet),
-    scanner,
-    alerter,
-    log,
-  });
 
   const controller = new AbortController();
   const shutdown = (signal: string): void => {
@@ -269,6 +403,58 @@ async function main(): Promise<void> {
   process.on("SIGINT", () => shutdown("SIGINT"));
   process.on("SIGTERM", () => shutdown("SIGTERM"));
 
+  // One monitor per wallet. Each wallet has its own vault and therefore its own
+  // authorised signer, so the dispatch is per-wallet. With Alchemy the pending
+  // feed is filtered by the protected wallet; without it each connection sees
+  // the standard hash feed and resolves transactions itself.
+  const monitors: Monitor[] = [];
+  const executors: Executor[] = [];
+  const executorAddresses: string[] = [];
+
+  for (const wallet of config.wallets) {
+    const signer = await signerFor(wallet, http);
+    const address = await signer.getAddress().catch(() => "");
+    if (address !== "") executorAddresses.push(address);
+
+    const executor = new Executor(signer, http, {
+      dryRun: options.dryRun,
+      minExecutorEth,
+      maxGasPriceGwei: 0n,
+      ...(config.flashbotsRelay !== "" ? { flashbotsRelay: config.flashbotsRelay } : {}),
+      log,
+      // Stranded tokens and on-chain rescue failures must reach the operator's
+      // alert channels, not just the console.
+      alert: (alert) => alerter.deliver(alert),
+    });
+    executors.push(executor);
+
+    if (options.dryRun) {
+      // Confirm the signer really is the vault's executor before going live, so
+      // a dry run catches the mistake that would otherwise waste a real rescue.
+      const outcome = await executor.rescue(wallet, {
+        rule: "NONE",
+        reason: "startup pre-flight",
+        severity: "MEDIUM",
+      });
+      log(`pre-flight for "${wallet.label}": ${outcome.status}`);
+    }
+
+    const rescuer: Rescuer = {
+      rescue: (w, reason, tokens) => executor.rescue(w, reason, tokens),
+    };
+
+    const monitor = new Monitor({
+      createProvider: createProviderFactory(config, http, wallet.protectedWallet, alchemyKey),
+      wallets: [wallet],
+      executor: rescuer,
+      scanner,
+      alerter,
+      log,
+    });
+    monitors.push(monitor);
+  }
+
+  // Executor balance check: a rescue that cannot pay for gas is worse than none.
   const balanceCheck = setInterval(async () => {
     for (let i = 0; i < executorAddresses.length; i++) {
       try {
@@ -278,6 +464,7 @@ async function main(): Promise<void> {
           await alerter.deliver(
             buildAlert({
               wallet: "system",
+              kind: "alert",
               rule: "NONE",
               severity: "HIGH",
               reason: `Executor ${addr} balance ${bal} wei below floor ${minExecutorEth} wei.`,
@@ -293,39 +480,25 @@ async function main(): Promise<void> {
   }, 5 * 60 * 1000);
   balanceCheck.unref();
 
-  try {
-    await monitor.run(controller.signal);
-  } catch (error) {
-    if (error instanceof ReconnectExhaustedError) {
-      console.error(`[bot] ${error.message}`);
-      process.exitCode = 1;
-      return;
-    }
-    throw error;
-  }
+  // Run every wallet's monitor concurrently. A dead feed on one wallet must not
+  // stop the others; only an exhausted-reconnect on a monitor is logged.
+  await Promise.all(
+    monitors.map(async (monitor) => {
+      try {
+        await monitor.run(controller.signal);
+      } catch (error) {
+        if (error instanceof ReconnectExhaustedError) {
+          console.error(`[bot] lost the mempool feed: ${error.message}`);
+          process.exitCode = 1;
+          return;
+        }
+        throw error;
+      }
+    }),
+  );
 
   http.destroy();
-  ws.destroy();
   log("Stopped.");
-}
-
-/**
- * Routes a rescue to the executor that owns that wallet's vault. The monitor
- * holds a single rescuer, but each wallet has its own vault and therefore its
- * own authorised signer, so the dispatch happens here.
- */
-class DispatchingExecutor implements Rescuer {
-  private readonly fallback: Executor;
-
-  constructor(private readonly byWallet: Map<string, Executor>) {
-    const first = byWallet.values().next();
-    if (first.done === true) throw new ConfigError("No wallets configured.");
-    this.fallback = first.value;
-  }
-
-  async rescue(wallet: WalletConfig, reason: RescueReason, tokens?: string[]): Promise<RescueOutcome> {
-    return (this.byWallet.get(wallet.label) ?? this.fallback).rescue(wallet, reason, tokens);
-  }
 }
 
 main().catch((error: unknown) => {

@@ -53,7 +53,24 @@ export function AlertFeed({ alerts, isDemo, isPro, hasBotConfigured }: AlertFeed
       data-testid="alert-feed"
       className="rounded-2xl border border-border bg-bg-secondary p-5"
     >
-      <h2 className="text-sm font-semibold text-text-primary">Recent activity</h2>
+      <div className="flex items-center gap-2">
+        <h2 className="text-sm font-semibold text-text-primary">Recent activity</h2>
+        {isDemo && (
+          <span
+            data-testid="alert-feed-demo-badge"
+            className="rounded-full border border-accent-yellow/40 bg-accent-yellow/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-accent-yellow"
+          >
+            Demo · future feature
+          </span>
+        )}
+      </div>
+
+      {isDemo && (
+        <p className="mt-2 text-xs text-text-secondary" data-testid="alert-feed-demo-note">
+          Simulated sample alerts. A live in-dashboard feed is a future feature — today the bot
+          reports incidents through its own console, Telegram and webhook channels, not this page.
+        </p>
+      )}
 
       {!isDemo && (
         <p className="mt-2 text-sm text-text-secondary" data-testid="alert-feed-empty">

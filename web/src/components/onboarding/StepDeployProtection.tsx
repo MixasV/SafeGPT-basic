@@ -1,7 +1,5 @@
-﻿import { useState } from "react";
-import type { Address } from "viem";
+﻿import type { Address } from "viem";
 
-import { WAITLIST_COPY } from "../../config/content";
 import { useMode } from "../../hooks/useMode";
 import { useOnboardingStore } from "../../state/onboarding";
 import { explorerAddressUrl, explorerTxUrl } from "../../config/tokens";
@@ -59,11 +57,8 @@ export function StepDeployProtection({
   const safeAddress = useOnboardingStore((state) => state.safeAddress);
   const factoryAddress = useOnboardingStore((state) => state.factoryAddress);
 
-  const [variant, setVariant] = useState<"A" | "B">("A");
-
   const busy = phase === "deploying-factory" || phase === "creating-vault" || phase === "confirming";
   const deployed = Boolean(vaultAddress) || phase === "done";
-  const guardianSelected = variant === "B";
 
   return (
     <StepFrame
@@ -80,7 +75,7 @@ export function StepDeployProtection({
           ) : (
             <PrimaryButton
               onClick={deploy}
-              disabled={busy || !safeAddress || guardianSelected}
+              disabled={busy || !safeAddress}
               testId="deploy-submit"
             >
               Deploy Protection
@@ -89,74 +84,6 @@ export function StepDeployProtection({
         </>
       }
     >
-      {/*
-        Variant choice.
-
-        Placed on the deploy step rather than a new step so the existing wizard
-        flow and its E2E assertions stay untouched: Variant A is preselected,
-        so a user who ignores this block never sees a difference.
-
-        Guardian+ is selectable but NOT deployable. The contracts exist and are
-        tested, but the bot does not yet execute rescues through them, so
-        allowing the deployment would hand someone a protection contract that
-        silently does nothing.
-      */}
-      <fieldset data-testid="variant-picker">
-        <legend className="text-sm font-medium text-text-primary">Protection variant</legend>
-
-        <div className="mt-2 grid gap-2 sm:grid-cols-2">
-          <label
-            className={`cursor-pointer rounded-lg border p-3 transition-colors ${
-              variant === "A" ? "border-accent bg-accent/10" : "border-border bg-bg-tertiary"
-            }`}
-          >
-            <span className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="variant"
-                value="A"
-                checked={variant === "A"}
-                onChange={() => setVariant("A")}
-                data-testid="variant-a"
-                className="accent-accent"
-              />
-              <span className="text-sm font-medium text-text-primary">Variant A — Approve</span>
-            </span>
-            <span className="mt-1 block pl-6 text-xs text-text-secondary">
-              Available now. Pre-approve the vault, then race the attacker on gas.
-            </span>
-          </label>
-
-          <label
-            className={`cursor-pointer rounded-lg border p-3 transition-colors ${
-              variant === "B" ? "border-accent-yellow bg-accent-yellow/10" : "border-border bg-bg-tertiary"
-            }`}
-          >
-            <span className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="variant"
-                value="B"
-                checked={variant === "B"}
-                onChange={() => setVariant("B")}
-                data-testid="variant-b"
-                className="accent-accent-yellow"
-              />
-              <span className="text-sm font-medium text-text-primary">Guardian Module</span>
-            </span>
-            <span className="mt-1 block pl-6 text-xs text-text-secondary">
-              Waitlist. Timelock and veto instead of a standing approval.
-            </span>
-          </label>
-        </div>
-
-        {guardianSelected && (
-          <WarningBanner tone="warning" className="mt-3" title="Guardian+ is not available yet">
-            <span data-testid="guardian-waitlist">{WAITLIST_COPY}</span>
-          </WarningBanner>
-        )}
-      </fieldset>
-
       <div className="rounded-lg border border-border bg-bg-tertiary p-4 text-sm">
         <p className="font-medium text-text-primary">Your protection contract</p>
         <dl className="mt-2 grid gap-1 text-text-secondary">
@@ -234,16 +161,6 @@ export function StepDeployProtection({
             <input
               value={params.executor}
               onChange={(event) => onParamsChange({ executor: event.target.value as Address })}
-              spellCheck={false}
-              className="w-full rounded-md border border-border bg-bg-primary px-2 py-1 font-mono text-xs text-text-primary"
-            />
-          </label>
-
-          <label className="block">
-            <span className="mb-1 block text-xs text-text-secondary">Fee receiver</span>
-            <input
-              value={params.feeReceiver}
-              onChange={(event) => onParamsChange({ feeReceiver: event.target.value as Address })}
               spellCheck={false}
               className="w-full rounded-md border border-border bg-bg-primary px-2 py-1 font-mono text-xs text-text-primary"
             />

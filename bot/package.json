@@ -12,6 +12,8 @@
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
     "bot": "tsx src/index.ts",
+    "init": "tsx src/commands/init.ts",
+    "import-config": "tsx src/commands/import-config.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

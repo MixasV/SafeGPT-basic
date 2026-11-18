@@ -7,8 +7,7 @@ import { StepApproveProtection } from "../components/onboarding/StepApproveProte
 import { StepConnectWallet } from "../components/onboarding/StepConnectWallet";
 import { AskAI } from "../features/dashboard/AskAI";
 import { StepHowItWorks } from "../components/onboarding/StepHowItWorks";
-import { StepQuiz } from "../components/onboarding/StepQuiz";
-import { ChainGPTSetup } from "../components/onboarding/ChainGPTSetup";
+import { StepSetupKeys } from "../components/onboarding/StepSetupKeys";
 import { StepDeployProtection } from "../components/onboarding/StepDeployProtection";
 import { StepDrainerCheck } from "../components/onboarding/StepDrainerCheck";
 import { StepAlerts, StepRules, StepWhitelist } from "../components/onboarding/StepProConfig";
@@ -19,7 +18,7 @@ import { StepSelectAssets } from "../components/onboarding/StepSelectAssets";
 import { PreDeployReview } from "../components/onboarding/PreDeployReview";
 import { WizardShell } from "../components/onboarding/WizardShell";
 import { DEMO_MODE } from "../config/demo";
-import { DEFAULT_FEE_BPS, getWethAddress, wethAbi } from "../config/contracts";
+import { DEFAULT_FEE_BPS, DEFAULT_FEE_RECEIVER, getWethAddress, wethAbi } from "../config/contracts";
 import { DEMO_ADDRESSES } from "../config/tokens";
 import { useApprovalFlow } from "../hooks/useApprovalFlow";
 import { useMode, useModeStore } from "../hooks/useMode";
@@ -27,12 +26,13 @@ import { useVaultDeploy } from "../hooks/useVaultDeploy";
 import { BEGINNER_STEPS, PRO_STEPS, useOnboardingStore, type WizardStepId } from "../state/onboarding";
 import { trackEvent } from "../utils/analytics";
 
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
 const STEP_META: Record<WizardStepId, { title: string; description: string }> = {
   "how-it-works": { title: "How it works", description: "Overview" },
-  quiz: { title: "Understanding check", description: "Quick quiz" },
+  "setup-keys": { title: "Setup keys", description: "API keys & services" },
   connect: { title: "Connect wallet", description: "Pick the wallet to protect" },
   drainer: { title: "Safety check", description: "Detect an active sweeper" },
-  chaingpt: { title: "ChainGPT AI", description: "Optional AI setup" },
   "safe-address": { title: "Safe address", description: "Where funds are rescued to" },
   executor: { title: "Executor (bot)", description: "Bot wallet that pays gas" },
   assets: { title: "Select assets", description: "Scan ERC-20 balances" },
@@ -76,9 +76,12 @@ export function Setup() {
     reset,
   } = store;
 
-  const [executor, setExecutor] = useState<Address>("0x0000000000000000000000000000000000000000");
-  const [feeReceiver, setFeeReceiver] = useState<Address>("0x0000000000000000000000000000000000000000");
-  const [feeBps, setFeeBps] = useState<number>(DEFAULT_FEE_BPS);
+  // Executor, feeBps and feeReceiver are collected in the "Setup keys" step and
+  // persisted in the onboarding store. Initialise the deploy-time params from
+  // the store so those values actually reach the vault constructor, then let the
+  // deploy screen override them locally.
+  const [executor, setExecutor] = useState<Address>((store.executor || ZERO_ADDRESS) as Address);
+  const [feeBps, setFeeBps] = useState<number>(store.feeBps || DEFAULT_FEE_BPS);
   const [wrapping, setWrapping] = useState(false);
   const [wrapError, setWrapError] = useState("");
 
@@ -101,13 +104,21 @@ export function Setup() {
     }
   }, [account, walletAddress, reset, setWalletAddress]);
 
-  // Default the executor and fee receiver to the connected wallet so the wizard
-  // works out of the box; Pro mode exposes both for a self-hosted deployment.
-  const resolvedExecutor = executor;
-  const resolvedFeeReceiver =
-    feeReceiver === "0x0000000000000000000000000000000000000000"
-      ? (safeAddress || account || "0x0000000000000000000000000000000000000000")
-      : feeReceiver;
+  // The executor is the bot's gas-paying hot wallet, collected in the dedicated
+  // wizard step (store.executor). Pro mode can override it on the deploy screen
+  // through the local field. It is never the protected wallet — that is the cold
+  // storage the bot rescues FROM. RescueVault's constructor rejects a zero
+  // executor, so the Beginner deploy (which exposes no executor field) must fall
+  // back to the store value the wizard step already gathered.
+  const resolvedExecutor = (
+    executor !== ZERO_ADDRESS
+      ? executor
+      : store.executor && store.executor !== ZERO_ADDRESS
+        ? store.executor
+        : ZERO_ADDRESS
+  ) as Address;
+  // Fee receiver is always the SafeGPT developer address — hardcoded, not user-settable.
+  const resolvedFeeReceiver = DEFAULT_FEE_RECEIVER;
 
   const deployHook = useVaultDeploy(walletClient, publicClient, {
     owner: account ?? ("0x0000000000000000000000000000000000000000" as Address),
@@ -164,21 +175,6 @@ export function Setup() {
     },
     [setStep, mode],
   );
-
-  useEffect(() => {
-    if (step !== "quiz") return;
-    try {
-      const raw = localStorage.getItem("safegpt_quiz_completed");
-      if (raw) {
-        const parsed = JSON.parse(raw) as { version?: number };
-        if (parsed.version === 1) {
-          goTo(activeIndex + 1);
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }, [step, activeIndex, goTo]);
 
   /** Ends the wizard from any step, Pro or Beginner. */
   const finishWizard = useCallback(() => {
@@ -269,17 +265,14 @@ export function Setup() {
       case "how-it-works":
         return <StepHowItWorks onContinue={() => goTo(activeIndex + 1)} />;
 
-      case "quiz":
-        return <StepQuiz onContinue={() => goTo(activeIndex + 1)} />;
+      case "setup-keys":
+        return <StepSetupKeys onBack={() => goTo(activeIndex - 1)} onContinue={() => goTo(activeIndex + 1)} />;
 
       case "connect":
         return <StepConnectWallet connected={isConnected || DEMO_MODE} onContinue={() => goTo(activeIndex + 1)} />;
 
       case "drainer":
         return <StepDrainerCheck onBack={() => goTo(activeIndex - 1)} onContinue={() => goTo(activeIndex + 1)} />;
-
-      case "chaingpt":
-        return <ChainGPTSetup onContinue={() => goTo(activeIndex + 1)} />;
 
       case "safe-address":
         return (
@@ -328,9 +321,14 @@ export function Setup() {
             deploy={() => void deployHook.deploy()}
             params={{ executor: resolvedExecutor as Address, feeReceiver: resolvedFeeReceiver as Address, feeBps }}
             onParamsChange={(patch) => {
-              if (patch.executor !== undefined) setExecutor(patch.executor);
-              if (patch.feeReceiver !== undefined) setFeeReceiver(patch.feeReceiver);
-              if (patch.feeBps !== undefined) setFeeBps(patch.feeBps);
+              if (patch.executor !== undefined) {
+                setExecutor(patch.executor);
+                store.setExecutor(patch.executor);
+              }
+              if (patch.feeBps !== undefined) {
+                setFeeBps(patch.feeBps);
+                store.setFeeBps(patch.feeBps);
+              }
             }}
             onBack={() => goTo(activeIndex - 1)}
             onContinue={() => goTo(activeIndex + 1)}
@@ -362,7 +360,6 @@ export function Setup() {
             chainId={chainId}
             vaultAddress={vaultAddress as Address}
             safeAddress={safeAddress}
-            executorAddress={resolvedExecutor}
             assets={assets}
             onFinish={() => {
               complete();
@@ -430,7 +427,6 @@ export function Setup() {
             reset();
             setWalletAddress("");
             setExecutor("0x0000000000000000000000000000000000000000");
-            setFeeReceiver("0x0000000000000000000000000000000000000000");
             setFeeBps(DEFAULT_FEE_BPS);
             setChainId(chainId);
             window.location.reload();

@@ -16,9 +16,10 @@ export const SELECTORS = {
   owner: id("owner()").slice(0, 10),
   executor: id("executor()").slice(0, 10),
   safeAddress: id("safeAddress()").slice(0, 10),
-  guardian: id("guardian()").slice(0, 10),
   balanceOf: id("balanceOf(address)").slice(0, 10),
   allowance: id("allowance(address,address)").slice(0, 10),
+  /** The vault's service fee in basis points. */
+  feeBps: id("feeBps()").slice(0, 10),
 } as const;
 
 /**
@@ -72,6 +73,56 @@ export async function getTransactionCount(
 export async function getChainId(provider: RpcReader): Promise<number> {
   const raw = (await provider.send("eth_chainId", [])) as string;
   return Number.parseInt(raw, 16);
+}
+
+/** The subset of a transaction receipt the executor reads to confirm a rescue. */
+export interface TransactionReceipt {
+  /** 1 = success, 0 = reverted. */
+  status: number;
+  blockNumber: number;
+  logs: Array<{ address: string; topics: string[]; data: string }>;
+}
+
+/**
+ * Polls `eth_getTransactionReceipt` until the transaction is mined or the
+ * deadline passes.
+ *
+ * Confirmation is best-effort: the rescue has already been broadcast by the
+ * time this runs, so a node that cannot serve receipts (or a timeout) returns
+ * null rather than throwing. The caller reports "broadcast, not yet confirmed"
+ * instead of treating an unconfirmed rescue as a failed one.
+ */
+export async function waitForReceipt(
+  provider: RpcReader,
+  hash: string,
+  options: { timeoutMs?: number; pollMs?: number; sleep?: (ms: number) => Promise<void> } = {},
+): Promise<TransactionReceipt | null> {
+  const timeoutMs = options.timeoutMs ?? 60_000;
+  const pollMs = options.pollMs ?? 3_000;
+  const sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+  const deadline = Date.now() + timeoutMs;
+
+  for (;;) {
+    let raw: unknown;
+    try {
+      raw = await provider.send("eth_getTransactionReceipt", [hash]);
+    } catch {
+      return null;
+    }
+    if (raw !== null && raw !== undefined) {
+      const receipt = raw as { status?: string | number; blockNumber?: string | number; logs?: unknown[] };
+      return {
+        status: Number(receipt.status ?? 0),
+        blockNumber: Number(receipt.blockNumber ?? 0),
+        logs: (receipt.logs ?? []).map((entry) => {
+          const log = entry as { address?: string; topics?: string[]; data?: string };
+          return { address: log.address ?? "", topics: log.topics ?? [], data: log.data ?? "0x" };
+        }),
+      };
+    }
+    if (Date.now() >= deadline) return null;
+    await sleep(pollMs);
+  }
 }
 
 /** Reads the token state the scanner needs. */

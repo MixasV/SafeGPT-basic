@@ -1,71 +1,65 @@
 import { Wallet } from "ethers";
-import { scryptSync, createCipheriv, randomBytes } from "node:crypto";
-import { writeFileSync } from "node:fs";
+import { parse } from "dotenv";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
-export async function init(configPath: string = "./config.yaml"): Promise<void> {
-  const password = await prompt("Create password (min 8 chars):");
-  if (password.length < 8) {
-    console.error("Min 8 characters");
-    process.exit(1);
-  }
-  const confirm = await prompt("Confirm password:");
-  if (password !== confirm) {
-    console.error("Passwords do not match");
-    process.exit(1);
+/**
+ * Creates the bot's executor wallet and stores its private key in the project
+ * `.env` as EXECUTOR_KEY.
+ *
+ * The key never goes into config.yaml — the config references it as
+ * ENV:EXECUTOR_KEY, and `.env` is gitignored, so the secret stays on this
+ * machine. The address printed here is what the operator pastes into the
+ * wizard's Executor step and funds with gas.
+ */
+
+const PROJECT_ROOT = join(import.meta.dirname, "..", "..", "..");
+const ENV_PATH = join(PROJECT_ROOT, ".env");
+
+/** Replaces an existing `NAME=` line, or appends one when absent. */
+function upsertEnvValue(name: string, value: string): void {
+  const raw = existsSync(ENV_PATH) ? readFileSync(ENV_PATH, "utf8") : "";
+  const line = `${name}=${value}`;
+  const pattern = new RegExp(`^${name}=.*$`, "m");
+  const next = pattern.test(raw)
+    ? raw.replace(pattern, () => line)
+    : raw === "" || raw.endsWith("\n")
+      ? `${raw}${line}\n`
+      : `${raw}\n${line}\n`;
+  writeFileSync(ENV_PATH, next);
+}
+
+export async function init(): Promise<void> {
+  const existing = existsSync(ENV_PATH) ? parse(readFileSync(ENV_PATH, "utf8")) : {};
+  const currentKey = existing.EXECUTOR_KEY?.trim();
+  if (currentKey) {
+    // A funded executor key must never be replaced silently — doing so would
+    // orphan the vault's approvals and strand the gas money.
+    const address = new Wallet(currentKey).address;
+    console.log(`EXECUTOR_KEY is already set in ${ENV_PATH}.`);
+    console.log(`Existing executor address: ${address}`);
+    console.log("Refusing to overwrite it. To use a different wallet, remove EXECUTOR_KEY from .env and run init again.");
+    return;
   }
 
   const wallet = Wallet.createRandom();
-  const salt = randomBytes(32);
-  const iv = randomBytes(16);
-  const key = scryptSync(password, salt, 32);
-  const cipher = createCipheriv("aes-256-gcm", key, iv);
-  let encrypted = cipher.update(wallet.privateKey, "utf8", "hex");
-  encrypted += cipher.final("hex");
-  const authTag = cipher.getAuthTag().toString("hex");
+  upsertEnvValue("EXECUTOR_KEY", wallet.privateKey);
 
-  const yaml = `# SafeGPT Bot Configuration
-executor:
-  address: "${wallet.address}"
-  encryptedKey: "${encrypted}"
-  salt: "${salt.toString("hex")}"
-  iv: "${iv.toString("hex")}"
-  authTag: "${authTag}"
-
-vault:
-  address: ""
-  chainId: 1
-
-protectedWallet: ""
-safeAddress: ""
-tokens: []
-
-rpc:
-  primary: "https://eth.llamarpc.com"
-  fallback:
-    - "https://rpc.ankr.com/eth"
-
-rescue:
-  maxGasPriceGwei: 300
-  gasPriceMultiplier: 1.2
-  minExecutorBalanceETH: 0.005
-
-notifications:
-  telegram:
-    enabled: false
-`;
-
-  writeFileSync(configPath, yaml);
   console.log(`Executor wallet created: ${wallet.address}`);
-  console.log(`Config saved to: ${configPath}`);
-  console.log(`Next: npx safegpt-bot setup-telegram`);
+  console.log(`Private key saved to ${ENV_PATH} as EXECUTOR_KEY (gitignored — never commit it).`);
+  console.log("");
+  console.log("Next steps:");
+  console.log(`  1. Send 0.02-0.05 ETH to ${wallet.address} so the bot can pay for rescue gas.`);
+  console.log("  2. Paste that address into the wizard's Executor step.");
+  console.log("  3. After deploying, download the config from the wizard and run:");
+  console.log("       npm run import-config -- <wizard-export.json> --rpc-wss <wss://...> --rpc-http <https://...>");
 }
 
-function prompt(question: string): Promise<string> {
-  return new Promise((resolve) => {
-    const rl = require("readline").createInterface({ input: process.stdin, output: process.stdout });
-    rl.question(question + " ", (answer: string) => {
-      rl.close();
-      resolve(answer);
-    });
+const invokedDirectly = process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (invokedDirectly) {
+  init().catch((error: unknown) => {
+    console.error(`[init] ${(error as Error).message}`);
+    process.exitCode = 1;
   });
 }

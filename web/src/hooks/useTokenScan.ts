@@ -5,16 +5,15 @@ import {
   http,
   isAddress,
   type Address,
-  type Chain,
   type PublicClient,
 } from "viem";
-import { arbitrum, base, mainnet, sepolia } from "viem/chains";
 
 import { DEMO_MODE } from "../config/demo";
 import { erc20Abi, rescueVaultAbi } from "../config/contracts";
 import { findTokenOnOtherChains, isVerifiedToken } from "../config/verified-tokens";
 import type { TokenInfo } from "../config/tokens";
 import { useOnboardingStore } from "../state/onboarding";
+import { alchemyRpcUrl, chainById, resolveRpcUrl } from "../lib/integrations";
 
 export type ScanSource = "alchemy" | "explorer" | "bundled" | "demo" | "failed";
 
@@ -27,58 +26,54 @@ export interface ScanResult {
   tokens: ScannedToken[];
 }
 
-const ALCHEMY_NETWORKS: Record<number, string> = {
-  1: "eth-mainnet",
-  11155111: "eth-sepolia",
-  8453: "base-mainnet",
-  42161: "arb-mainnet",
-};
+/**
+ * Reads the Alchemy key the same way the rest of the app does: the value the
+ * user entered in "Setup Keys" (localStorage) takes precedence, with the
+ * VITE_ env var as a fallback for pre-configured deployments. Previously this
+ * read ONLY import.meta.env, which meant a user who entered their key in the
+ * UI still scanned via the explorer/bundled fallback — the UI key was ignored.
+ */
+function alchemyApiKey(): string {
+  const fromStorage = localStorage.getItem("safegpt_alchemy_key")?.trim();
+  if (fromStorage) return fromStorage;
+  return (import.meta.env.VITE_ALCHEMY_API_KEY as string | undefined)?.trim() ?? "";
+}
 
-const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY as string | undefined;
 const EXPLORER_API_KEY = import.meta.env.VITE_EXPLORER_API_KEY as string | undefined;
 
-const CHAIN_BY_ID: Record<number, Chain> = {
-  [mainnet.id]: mainnet,
-  [sepolia.id]: sepolia,
-  [base.id]: base,
-  [arbitrum.id]: arbitrum,
-};
-
 /**
- * Public RPC endpoints that permit browser CORS. These are free, require no
- * API key, and work from a browser page — unlike most free endpoints which
- * block cross-origin requests. When VITE_RPC_URL_<chainId> is set it takes
- * precedence, so a self-hosted instance can point at its own node.
+ * Builds an RPC URL for a chain: the user's Alchemy key when present, else a
+ * public endpoint. Uses the shared resolver from integrations.ts so all parts
+ * of the app agree on the URL for the same chain. Throws (rather than silently
+ * falling back to mainnet) when no endpoint is available — scanning on the
+ * wrong chain returns wrong balances, which is worse than a clear error.
  */
-const DEFAULT_RPC_URLS: Record<number, string> = {
-  [mainnet.id]: "https://ethereum.publicnode.com",
-  [sepolia.id]: "https://ethereum-sepolia.publicnode.com",
-  [base.id]: "https://mainnet.base.org",
-  [arbitrum.id]: "https://arb1.arbitrum.io/rpc",
-};
-
 function rpcUrl(chainId: number): string {
-  const override = import.meta.env[`VITE_RPC_URL_${chainId}`] as string | undefined;
-  if (override) return override;
-  const fallback = DEFAULT_RPC_URLS[chainId];
-  if (!fallback) {
-    throw new Error(`No RPC endpoint configured for chain ${chainId}. Set VITE_RPC_URL_${chainId}.`);
+  const url = resolveRpcUrl(chainId, alchemyApiKey());
+  if (!url) {
+    throw new Error(
+      `No RPC endpoint for chain ${chainId}. Enter an Alchemy key in Setup Keys or set VITE_RPC_URL_${chainId}.`,
+    );
   }
-  return fallback;
+  return url;
 }
 
 /** Standalone client so the hook works outside the wagmi React context. */
 function publicClientFor(chainId: number): PublicClient {
-  const chain = CHAIN_BY_ID[chainId] ?? mainnet;
+  const chain = chainById(chainId);
+  if (!chain) {
+    throw new Error(`Unsupported chain ${chainId}. Supported chains: Ethereum, Base, Arbitrum, Avalanche, Sepolia, Fuji.`);
+  }
   return createPublicClient({ chain, transport: http(rpcUrl(chainId), { timeout: 8_000 }) });
 }
 
 /** Level 1 — indexer API (Alchemy). Fast and complete when a key is configured. */
 async function scanViaIndexer(owner: Address, chainId: number): Promise<ScanResult | null> {
-  const network = ALCHEMY_NETWORKS[chainId];
-  if (!network || !ALCHEMY_API_KEY) return null;
+  const apiKey = alchemyApiKey();
+  if (!apiKey) return null;
 
-  const rpcUrl = `https://${network}.g.alchemy.com/v2/${ALCHEMY_API_KEY}`;
+  const rpcUrl = alchemyRpcUrl(chainId, apiKey);
+  if (!rpcUrl) return null;
 
   const balancesResponse = await fetch(rpcUrl, {
     method: "POST",

@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+import { DEFAULT_FEE_RECEIVER } from "../config/contracts";
+
 /**
  * Onboarding state (specification section 4.3.2, updated by UPD-3 with the
  * deploy step). Persisted to localStorage so a refresh mid-onboarding does not
@@ -8,10 +10,9 @@ import { persist } from "zustand/middleware";
  */
 export type WizardStepId =
   | "how-it-works"
-  | "quiz"
+  | "setup-keys"
   | "connect"
   | "drainer"
-  | "chaingpt"
   | "safe-address"
   | "executor"
   | "assets"
@@ -26,10 +27,9 @@ export type WizardStepId =
 
 export const BEGINNER_STEPS: readonly WizardStepId[] = [
   "how-it-works",
-  "quiz",
+  "setup-keys",
   "connect",
   "drainer",
-  "chaingpt",
   "safe-address",
   "executor",
   "assets",
@@ -100,6 +100,12 @@ interface OnboardingState {
   rules: RuleSettings;
   /** Pro step: alert channels. */
   alertsConfig: AlertSettings;
+  /** Alchemy API key entered during onboarding / settings. */
+  alchemyKey: string;
+  /** Rescue fee in basis points (300 = 3%). 0 disables the fee. */
+  feeBps: number;
+  /** Address that receives rescue fees. */
+  feeReceiver: string;
   completed: boolean;
 
   setStep: (step: WizardStepId) => void;
@@ -121,6 +127,9 @@ interface OnboardingState {
   setWhitelist: (addresses: string[]) => void;
   setRules: (rules: RuleSettings) => void;
   setAlertsConfig: (alerts: AlertSettings) => void;
+  setAlchemyKey: (key: string) => void;
+  setFeeBps: (feeBps: number) => void;
+  setFeeReceiver: (feeReceiver: string) => void;
   complete: () => void;
   reset: () => void;
 }
@@ -154,6 +163,9 @@ const INITIAL = {
     telegramChatId: "",
     webhookUrl: "",
   } as AlertSettings,
+  alchemyKey: "",
+  feeBps: 300,
+  feeReceiver: DEFAULT_FEE_RECEIVER,
   completed: false,
 };
 
@@ -206,6 +218,9 @@ export const useOnboardingStore = create<OnboardingState>()(
       setWhitelist: (whitelist) => set({ whitelist }),
       setRules: (rules) => set({ rules }),
       setAlertsConfig: (alertsConfig) => set({ alertsConfig }),
+      setAlchemyKey: (alchemyKey) => set({ alchemyKey }),
+      setFeeBps: (feeBps) => set({ feeBps }),
+      setFeeReceiver: (feeReceiver) => set({ feeReceiver }),
       complete: () => set({ completed: true }),
       reset: () => set({ ...INITIAL }),
     }),

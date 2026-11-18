@@ -293,14 +293,15 @@ export function evaluate(
   }
 
   // R2 (native ETH) — a native ETH transfer to a non-whitelisted address.
-  // ETH cannot be rescued by the vault, but this signals an active attacker,
-  // so rescue ALL approved tokens immediately.
+  // Native ETH transfers cannot be rescued by the vault (it only handles ERC-20s),
+  // but a large ETH transfer to a non-whitelisted address signals an active attacker.
+  // We alert but do not rescue — the vault cannot move native ETH.
   if ((tx.data === "0x" || tx.data.length <= 2) && tx.value > 0n && tx.to !== null && !isWhitelisted(wallet, tx.to)) {
     return verdict(
-      "RESCUE",
-      "R2_NATIVE_ETH_TRANSFER",
-      `Native ETH transfer of ${tx.value} to non-whitelisted address ${tx.to}. Rescuing all protected tokens.`,
-      "CRITICAL",
+      "ALERT",
+      "R2_TRANSFER_UNKNOWN",
+      `Native ETH transfer of ${tx.value} to non-whitelisted address ${tx.to}. The vault cannot rescue native ETH — only ERC-20 tokens with allowance.`,
+      "HIGH",
     );
   }
 
